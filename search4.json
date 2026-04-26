@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://medium.com/@ricrivero3/how-i-built-an-ai-agent-for-end-to-end-mobile-app-qa-automation-934b211fc9ae",
+    "name": "How I built an AI agent for end to end mobile app QA automation",
+    "snippet": "Watch as the AI agent navigates your app, makes decisions, and provides detailed test results — all without writing a single line of test code.",
+    "host_name": "medium.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.mobileboost.io/post/ai-for-mobile-testing-top-18-no-code-self-healing-ai-testing-tools-september-2025",
+    "name": "Top 18 No-Code, Self-Healing AI Testing Tools (September 2025)",
+    "snippet": "This post reviews the top 18 no-code, self-healing AI testing vendors worth considering for a PoC, starting with MobileBoost, the tool Duolingo ...",
+    "host_name": "www.mobileboost.io",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=2uugc7aJKW8",
+    "name": "Make Selenium Smarter with GenAI | Self-Healing Locators & AI",
+    "snippet": "Kickstart Your AI Journey – Live! Join this LIVE session to discover how Generative AI can revolutionize your test automation — starting ... Missing: mobile | Show results with: mobile",
+    "host_name": "www.youtube.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.researchgate.net/publication/383019866_Self-Healing_Test_Automation_Framework_using_AI_and_ML",
+    "name": "(PDF) Self-Healing Test Automation Framework using AI and ML",
+    "snippet": "This paper explores the development and implementation of self-healing test automation frameworks that leverage Artificial Intelligence (AI) and Machine ...",
+    "host_name": "www.researchgate.net",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://medium.com/@suhanasyed2003/self-healing-tests-building-smarter-automation-with-ai-8539e10bea3f",
+    "name": "Self-Healing Tests: Building Smarter Automation with AI - Medium",
+    "snippet": "In simple terms, self-healing tests are test scripts that can detect and fix themselves when something in the application's UI changes — without ...",
+    "host_name": "medium.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.browserstack.com/docs/app-automate/appium/self-healing",
+    "name": "Use Self-Healing Agent for your Appium tests running on",
+    "snippet": "Automatically recovery your failed Appium tests using AI on BrowserStack App Automate. Self-Heal automatically detects when a locator no longer works and ... Missing: startup | Show results with: startup",
+    "host_name": "www.browserstack.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.pcloudy.com/self-healing-automation",
+    "name": "Self Healing Test Automation: The Future of Resilient Test Scripts",
+    "snippet": "With this new self healing test automation technology, automation engineers can now automate the maintenance effort using the AI based Self-Healing capability. Missing: code | Show results with: code",
+    "host_name": "www.pcloudy.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://dev.to/qa-leaders/i-built-selenium-self-healing-tests-with-ai-that-fix-themselves-heres-how-421j",
+    "name": "I Built Selenium Self-Healing Tests with AI That Fix Themselves",
+    "snippet": "A practical guide to creating self-healing test automation with free, local AI. Tagged with selenium, testing, ai, automation. Missing: mobile startup",
+    "host_name": "dev.to",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.linkedin.com/posts/prateek-sethi-testautomationenthusiast_aiintesting-testautomation-genai-activity-7303040466415955969-mSDs",
+    "name": "AI Test Automation: Mind-Blowing Results with Self-Healing Agents",
+    "snippet": "AI + Test Automation = Future of QA! I've been exploring the Self-Healing AI Test Automation Framework using LangChain, Playwright, ... Missing: mobile app startup",
+    "host_name": "www.linkedin.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.geeksforgeeks.org/software-testing/self-healing-automation-using-ai",
+    "name": "Self-healing automation using AI - GeeksforGeeks",
+    "snippet": "Self-healing test automation is an advanced AI-powered approach that allows automated test scripts to detect and fix issues on their own without ... Missing: startup | Show results with: startup",
+    "host_name": "www.geeksforgeeks.org",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

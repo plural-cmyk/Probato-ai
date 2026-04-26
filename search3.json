@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://onehorizon.ai/blog/ai-powered-code-review-tools",
+    "name": "10 Best AI-Powered Code Review Tools in 2026 - Blog",
+    "snippet": "10 Feb 2026 — The AI achieves a 70% resolution rate: 7 out of 10 bugs Devin flags, it can auto- fix if you approve. This is the most advanced AI code review ... Read more",
+    "host_name": "onehorizon.ai",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://getautonoma.com/blog/ai-powered-software-testing-autonoma",
+    "name": "AI-Powered Software Testing: The Future is Here with",
+    "snippet": "Discover how AI-powered testing with Autonoma eliminates maintenance, reduces flakiness, and enables 10x faster delivery. Self-healing tests in plain ...",
+    "host_name": "getautonoma.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.virtuosoqa.com/post/best-ai-testing-tools",
+    "name": "10 Best AI Testing Tools & Platforms in 2026",
+    "snippet": "16 Apr 2026 — AI testing platforms should trigger automatically on code commits, pull requests, and deployments. Real-Time Analytics and Dashboards. Read more",
+    "host_name": "www.virtuosoqa.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://checkmarx.com/learn/ai-security/top-12-ai-developer-tools-in-2026-for-security-coding-and-quality",
+    "name": "Top 12 AI Developer Tools in 2026 for Security, Coding",
+    "snippet": "11 Mar 2026 — Code Review and Refactoring Tools. AI-powered code review tools automatically analyze code submissions, flag potential issues, and provide ... Read more",
+    "host_name": "checkmarx.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.moderne.ai/blog/autonomous-testing-ai-developer-productivity",
+    "name": "Autonomous Testing for Code Productivity",
+    "snippet": "1 Jul 2025 — Learn how autonomous testing, AI, and intelligent profiling are redefining enterprise codebase management and developer productivity.",
+    "host_name": "www.moderne.ai",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://momentic.ai",
+    "name": "Momentic: AI-Powered Testing Tool for Web & Mobile",
+    "snippet": "Momentic is the automated testing platform built to help teams scale coverage, eliminate flaky tests, and ship with confidence.",
+    "host_name": "momentic.ai",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://abhiappmobiledeveloper.medium.com/speed-up-software-development-with-ai-tools-part-2-d8ef6f4d9647",
+    "name": "Speed up Software Development with AI Tools — Part 2",
+    "snippet": "Code Review AI Tools ... Devin is described as an AI that can write, run, and test code and even handle feature requests or bug fixes with ... Read more",
+    "host_name": "abhiappmobiledeveloper.medium.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.digitalocean.com/resources/articles/ai-testing-tools",
+    "name": "13 AI Testing Tools to Streamline Your QA Process in 2026",
+    "snippet": "6 Mar 2026 — Discover how AI testing tools improve development workflows to deliver bug-free software faster by automating manual regressions for stable ...",
+    "host_name": "www.digitalocean.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.ministryoftesting.com/software-testing-tools/octomind",
+    "name": "Octomind",
+    "snippet": "#agentic- ... Read more",
+    "host_name": "www.ministryoftesting.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.getpanto.ai/blog/vibe-debugging-ai-qa-testing",
+    "name": "Vibe Debugging: Revolutionizing AI-Powered QA Testing",
+    "snippet": "3 Oct 2025 — AI Code Review Agent : Continuously scans code changes (PRs) with static analysis, detecting bugs, code smells, or security issues. Autonomous ... Read more",
+    "host_name": "www.getpanto.ai",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]
