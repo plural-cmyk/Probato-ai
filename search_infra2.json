@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://iternal.ai/calculators/llm-pricing-calculator",
+    "name": "Free LLM Pricing Calculator 2026 — Compare GPT-4o,",
+    "snippet": "Key Insight: LLM API prices dropped approximately 80% between early 2025 and early 2026 . GPT -4o input pricing fell from $5.00 to $2.50 per million tokens ...",
+    "host_name": "iternal.ai",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.tldl.io/resources/llm-api-pricing-2026",
+    "name": "LLM API Pricing 2026 — Compare GPT-5, Claude 4  - TLDL",
+    "snippet": "24 Feb 2026 — At $ 0.20/$0.50 per million tokens , you get a 2M context for roughly the same price as Gemini 2.5 Flash — but with xAI's reasoning capabilities.",
+    "host_name": "www.tldl.io",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.silicondata.com/blog/llm-cost-per-token",
+    "name": "Understanding LLM Cost Per Token: A 2026 Practical Guide",
+    "snippet": "9 Jan 2026 — Claude Sonnet 4 charges $3.00 per million input tokens and $15.00 per million output tokens, while Claude Opus 4 reaches $15 input and $75 ...",
+    "host_name": "www.silicondata.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://pecollective.com/blog/llm-pricing-comparison-2026",
+    "name": "Cross-Provider LLM API Pricing Comparison (April 2026)",
+    "snippet": "6 Apr 2026 — Claude Opus 4 is the most expensive mainstream LLM at $ 15/$75 per million tokens . That price point only makes sense for tasks where quality ...",
+    "host_name": "pecollective.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://benchlm.ai/llm-pricing",
+    "name": "LLM API Pricing Comparison 2026 — Cost Per Token for",
+    "snippet": "GPT-5.4 is $2.50 input and $15.00 output per million tokens . GPT-5.4 Pro is $30.00 input and $180.00 output. That makes Pro 12x the cost on output tokens, so it ...",
+    "host_name": "benchlm.ai",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.sitepoint.com/local-llms-vs-cloud-api-cost-analysis-2026",
+    "name": "Local LLMs vs Cloud APIs: 2026 Total Cost of Ownership",
+    "snippet": "5 Mar 2026 — The table below captures published per - million - token rates . ... tokens , yielding an effective 36-month rate of $7.15 per million tokens .",
+    "host_name": "www.sitepoint.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.morphllm.com/llm-api",
+    "name": "LLM API Comparison 2026: Pricing, Speed, Features - Morph",
+    "snippet": "12 Mar 2026 — Prices range from $0.08 to $25 per million output tokens . Context windows span 128K to 1M tokens. Throughput ranges from 80 tok/s to 840 tok/s.",
+    "host_name": "www.morphllm.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://mem0.ai/blog/llm-api-cost-breakdown-claude-gemini-openai-compared",
+    "name": "LLM API Cost Breakdown: Claude, Gemini & OpenAI",
+    "snippet": "7 days ago — GPT -4.1's 1M token context window at $2.00/M input puts it between Gemini 2.5 Pro and Claude Sonnet 4.6 in both price and context capacity. GPT - ...",
+    "host_name": "mem0.ai",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "name": "Pricing - Claude API Docs",
+    "snippet": "Average ~3,700 tokens per conversation; Using Claude Haiku 4.5 at $1/MTok input, $5/MTok output; Total cost : ~$37.00 per 10,000 tickets. For a ...",
+    "host_name": "platform.claude.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.anthropic.com/news/claude-opus-4-7",
+    "name": "Introducing Claude Opus 4.7",
+    "snippet": "16 Apr 2026 — Pricing remains the same as Opus 4.6: $ 5 per million input tokens and $25 per million output tokens. Developers can use claude-opus-4-7 via the ...",
+    "host_name": "www.anthropic.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

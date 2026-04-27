@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://www.browserbase.com/pricing",
+    "name": "Pricing",
+    "snippet": "100concurrent browsers · 500 browser hours keyboard_arrow_down. then $0.10/ browser hr · 1,000Search calls keyboard_arrow_down. then $7/1k calls.",
+    "host_name": "www.browserbase.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.browserbase.com/enterprise",
+    "name": "Browser Agent Platform for Enterprise",
+    "snippet": "Browserbase has everything your agents need to browse and act on the web. No vendor juggling. No infrastructure headaches. Get a demo.",
+    "host_name": "www.browserbase.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.firecrawl.dev/blog/best-browser-agents",
+    "name": "11 Best AI Browser Agents in 2026",
+    "snippet": "... AI-enhanced browser automation with Playwright's precision. Pricing: Open-source. Browserbase cloud starts with a free trial, then usage-based pricing . 4 ...\nBrowserbase cloud starts with a free trial, then usage-based pricing. 4. Agent Browser. Agent Browser is Vercel Labs' open-source CLI tool built in Rust that ...",
+    "host_name": "www.firecrawl.dev",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.browserbase.com/blog/series-b-and-beyond",
+    "name": "Building the future of web automation",
+    "snippet": "Jun 18, 2025 — Hobby Developer plan: 50% price reduction to get started, from $39 to $20/month for 100 browser hours and 1 GB of proxies. More concurrent ...",
+    "host_name": "www.browserbase.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.rtrvr.ai/blog/rtrvr-vs-browserbase",
+    "name": "SOTA Web Agent vs Browser Infrastructure",
+    "snippet": "Jan 10, 2026 — Browserbase Pricing . Plan, Monthly, Browser Hours, Overage, Proxy. Free, $0, 1 hour, N/A, N/A. Developer, $20, 100 hours, $0.12/hr, $12/GB.",
+    "host_name": "www.rtrvr.ai",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  }
+]

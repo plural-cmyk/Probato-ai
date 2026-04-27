@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://maestro.dev/insights/end-to-end-ui-testing-for-mobile-apps-with-maestro",
+    "name": "End-to-End UI Testing for Mobile Apps with Maestro",
+    "snippet": "End-to-end mobile testing validates that complete user flows work correctly across devices, operating systems, and network conditions.",
+    "host_name": "maestro.dev",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://applitools.com/blog/cross-device-testing-mobile-apps",
+    "name": "Modern Cross-Device Testing for Android & iOS Apps - Applitools",
+    "snippet": "This post will shed light on the cross device testing practices you need to implement to get a step closer to Continuous Delivery for native mobile apps.",
+    "host_name": "applitools.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://sqa.stackexchange.com/questions/17106/how-can-i-set-up-concurrent-execution-on-multiple-devices-using-different-test-u",
+    "name": "How can I set up concurrent execution on multiple devices using",
+    "snippet": "This will show you how to run two devices on the same script and give them different inputs. However that will run serial.",
+    "host_name": "sqa.stackexchange.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://source.android.com/docs/core/tests/vts/multi-device-testing",
+    "name": "Multi-device testing | Android Open Source Project",
+    "snippet": "VTS supports tests that require interaction between multiple Android devices. Architecture VTS uses the TradeFed framework to get and pass device serials to ...",
+    "host_name": "source.android.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=83XQrw3B51I",
+    "name": "Cross-Browser and Cross-Device Testing at Scale - YouTube",
+    "snippet": "... testing efforts to cover multiple environments effortlessly and ensure a consistent user experience. • Discover strategies for boosting test ... Missing: calls notifications feature automation",
+    "host_name": "www.youtube.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://admhelp.microfocus.com/uft/en/26.1/UFT_Help/Content/MC/mobile_on_UFT_testMult.htm",
+    "name": "Cross-platform testing - ADM Help Centers",
+    "snippet": "To test multiple devices or applications simultaneously: Create an object repository parameter for the Device and/or the App test object's id or ...",
+    "host_name": "admhelp.microfocus.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.adaptarobotics.com/matt",
+    "name": "MATT the Smart Device Test Automation Robot - Adapta Robotics",
+    "snippet": "Automate cross-device testing for connectivity ... Test functionality like messaging, notifications, and calling and call interruption features.",
+    "host_name": "www.adaptarobotics.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.kapptivate.com/testing/mobile-app-testing",
+    "name": "Mobile App Testing on Real Devices - kapptivate",
+    "snippet": "It validates interactions, business logic, dynamic elements, session flows, and cross-device compatibility, all under real-world execution conditions. App ...",
+    "host_name": "www.kapptivate.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.browserstack.com/docs/app-automate/appium/set-up-test-env/cross-device-automation-agent",
+    "name": "Cross-Device Automation Agent | BrowserStack Docs",
+    "snippet": "Cross-Device Automation Agent lets you write test cases in plain English instead of selectors or code. The AI interprets natural language instructions, ...",
+    "host_name": "www.browserstack.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.researchgate.net/publication/335870565_Automated_Tests_for_Cross-Platform_Mobile_Apps_in_Multiple_Configurations",
+    "name": "(PDF) Automated Tests for Cross-Platform Mobile Apps in Multiple",
+    "snippet": "The article is devoted to the issues of automation of software creation processes and the issue of creating universal testing tools for mobile ...",
+    "host_name": "www.researchgate.net",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]
