@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Bug,
   Github,
@@ -14,6 +14,11 @@ import {
   CheckCircle2,
   AlertTriangle,
   Loader2,
+  Trash2,
+  RefreshCw,
+  Terminal,
+  X,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +30,16 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +47,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Project {
   id: string;
@@ -40,8 +62,27 @@ interface Project {
   repoName: string;
   status: string;
   branch: string;
+  sandboxId: string | null;
+  sandboxUrl: string | null;
   createdAt: string;
   lastRunAt: string | null;
+}
+
+interface SandboxStatus {
+  project: {
+    id: string;
+    name: string;
+    status: string;
+    sandboxUrl: string | null;
+  };
+  sandbox: {
+    containerId: string;
+    name: string;
+    status: string;
+    port?: number;
+    url?: string;
+  } | null;
+  logs: string;
 }
 
 export default function DashboardPage() {
@@ -49,6 +90,15 @@ export default function DashboardPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [repoUrl, setRepoUrl] = useState("");
+  const [repoName, setRepoName] = useState("");
+  const [branch, setBranch] = useState("main");
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [sandboxStatus, setSandboxStatus] = useState<SandboxStatus | null>(null);
+  const [sandboxLoading, setSandboxLoading] = useState(false);
+  const [launching, setLaunching] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -56,13 +106,7 @@ export default function DashboardPage() {
     }
   }, [status, router]);
 
-  useEffect(() => {
-    if (status === "authenticated") {
-      fetchProjects();
-    }
-  }, [status]);
-
-  async function fetchProjects() {
+  const fetchProjects = useCallback(async () => {
     try {
       const res = await fetch("/api/projects");
       if (res.ok) {
@@ -73,6 +117,104 @@ export default function DashboardPage() {
       console.error("Failed to fetch projects:", error);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchProjects();
+    }
+  }, [status, fetchProjects]);
+
+  async function createProject() {
+    if (!repoUrl.trim()) return;
+
+    setCreating(true);
+    try {
+      // Auto-extract repo name from URL if not provided
+      const name =
+        repoName.trim() ||
+        repoUrl
+          .replace(/\.git$/, "")
+          .split("/")
+          .pop() ||
+        "untitled";
+
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoUrl, repoName: name, branch }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setProjects((prev) => [data.project, ...prev]);
+        setDialogOpen(false);
+        setRepoUrl("");
+        setRepoName("");
+        setBranch("main");
+      }
+    } catch (error) {
+      console.error("Failed to create project:", error);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function launchSandbox(projectId: string) {
+    setLaunching(true);
+    try {
+      const res = await fetch("/api/sandbox", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        // Refresh projects to get updated status
+        await fetchProjects();
+        // Show sandbox status
+        await checkSandbox(projectId);
+      } else {
+        alert(data.message || data.error || "Failed to launch sandbox");
+      }
+    } catch (error) {
+      console.error("Failed to launch sandbox:", error);
+      alert("Failed to launch sandbox. Is Docker running?");
+    } finally {
+      setLaunching(false);
+    }
+  }
+
+  async function checkSandbox(projectId: string) {
+    setSandboxLoading(true);
+    try {
+      const res = await fetch(`/api/sandbox/${projectId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSandboxStatus(data);
+      }
+    } catch (error) {
+      console.error("Failed to check sandbox:", error);
+    } finally {
+      setSandboxLoading(false);
+    }
+  }
+
+  async function destroySandbox(projectId: string) {
+    try {
+      const res = await fetch(`/api/sandbox/${projectId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setSandboxStatus(null);
+        setSelectedProject(null);
+        await fetchProjects();
+      }
+    } catch (error) {
+      console.error("Failed to destroy sandbox:", error);
     }
   }
 
@@ -89,6 +231,7 @@ export default function DashboardPage() {
   const statusColors: Record<string, string> = {
     pending: "bg-amber/10 text-amber border-amber/20",
     cloning: "bg-electric-violet/10 text-electric-violet border-electric-violet/20",
+    running: "bg-emerald/10 text-emerald border-emerald/20",
     ready: "bg-emerald/10 text-emerald border-emerald/20",
     error: "bg-warm-red/10 text-warm-red border-warm-red/20",
   };
@@ -96,6 +239,7 @@ export default function DashboardPage() {
   const statusIcons: Record<string, typeof Clock> = {
     pending: Clock,
     cloning: Loader2,
+    running: CheckCircle2,
     ready: CheckCircle2,
     error: AlertTriangle,
   };
@@ -193,9 +337,9 @@ export default function DashboardPage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Ready</CardDescription>
+              <CardDescription>Running</CardDescription>
               <CardTitle className="text-3xl text-emerald">
-                {projects.filter((p) => p.status === "ready").length}
+                {projects.filter((p) => p.status === "running" || p.status === "ready").length}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -212,13 +356,71 @@ export default function DashboardPage() {
         {/* Projects Section */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-deep-indigo">Projects</h2>
-          <Button
-            className="bg-deep-indigo hover:bg-deep-indigo/90 text-white"
-            size="sm"
-          >
-            <Plus className="mr-1.5 h-4 w-4" />
-            New Project
-          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                className="bg-deep-indigo hover:bg-deep-indigo/90 text-white"
+                size="sm"
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                New Project
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Connect a Repository</DialogTitle>
+                <DialogDescription>
+                  Enter the GitHub repository URL to connect. Probato will clone
+                  it and prepare a sandboxed environment.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="repo-url">Repository URL</Label>
+                  <Input
+                    id="repo-url"
+                    placeholder="https://github.com/owner/repo"
+                    value={repoUrl}
+                    onChange={(e) => setRepoUrl(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="repo-name">Project Name (optional)</Label>
+                  <Input
+                    id="repo-name"
+                    placeholder="Auto-detected from URL"
+                    value={repoName}
+                    onChange={(e) => setRepoName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="branch">Branch</Label>
+                  <Select value={branch} onValueChange={setBranch}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="main">main</SelectItem>
+                      <SelectItem value="master">master</SelectItem>
+                      <SelectItem value="develop">develop</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  className="w-full bg-deep-indigo hover:bg-deep-indigo/90 text-white"
+                  onClick={createProject}
+                  disabled={creating || !repoUrl.trim()}
+                >
+                  {creating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Github className="mr-2 h-4 w-4" />
+                  )}
+                  {creating ? "Connecting..." : "Connect Repository"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {loading ? (
@@ -240,6 +442,7 @@ export default function DashboardPage() {
               </p>
               <Button
                 className="mt-6 bg-deep-indigo hover:bg-deep-indigo/90 text-white"
+                onClick={() => setDialogOpen(true)}
               >
                 <Plus className="mr-1.5 h-4 w-4" />
                 Connect Repository
@@ -253,7 +456,7 @@ export default function DashboardPage() {
               return (
                 <Card
                   key={project.id}
-                  className="transition-shadow hover:shadow-md cursor-pointer border-border/50"
+                  className="transition-shadow hover:shadow-md border-border/50"
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -278,16 +481,63 @@ export default function DashboardPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
                       <span>
                         Added {new Date(project.createdAt).toLocaleDateString()}
                       </span>
-                      {project.lastRunAt && (
-                        <span>
-                          Last run{" "}
-                          {new Date(project.lastRunAt).toLocaleDateString()}
+                      {project.sandboxUrl && (
+                        <span className="text-emerald font-mono">
+                          {project.sandboxUrl}
                         </span>
                       )}
+                    </div>
+                    <div className="flex gap-2">
+                      {project.status === "pending" && (
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-emerald hover:bg-emerald/90 text-white"
+                          onClick={() => launchSandbox(project.id)}
+                          disabled={launching}
+                        >
+                          {launching ? (
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Play className="mr-1.5 h-3.5 w-3.5" />
+                          )}
+                          Launch Sandbox
+                        </Button>
+                      )}
+                      {(project.status === "running" || project.status === "ready") && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => {
+                              setSelectedProject(project);
+                              checkSandbox(project.id);
+                            }}
+                          >
+                            <Terminal className="mr-1.5 h-3.5 w-3.5" />
+                            Status
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-warm-red hover:text-warm-red"
+                            onClick={() => destroySandbox(project.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => fetchProjects()}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -296,6 +546,109 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* Sandbox Status Drawer */}
+      {selectedProject && sandboxStatus && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => {
+              setSelectedProject(null);
+              setSandboxStatus(null);
+            }}
+          />
+          <div className="relative w-full max-w-lg bg-white shadow-xl overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <h3 className="font-semibold text-deep-indigo">
+                Sandbox: {selectedProject.repoName}
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedProject(null);
+                  setSandboxStatus(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Status */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium">Status:</span>
+                <Badge
+                  variant="outline"
+                  className={statusColors[sandboxStatus.project.status] ?? ""}
+                >
+                  {sandboxStatus.project.status}
+                </Badge>
+              </div>
+
+              {/* Container Info */}
+              {sandboxStatus.sandbox && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription>Container</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-xs font-mono space-y-1">
+                    <div>ID: {sandboxStatus.sandbox.containerId.slice(0, 12)}</div>
+                    <div>Name: {sandboxStatus.sandbox.name}</div>
+                    <div>Port: {sandboxStatus.sandbox.port ?? "N/A"}</div>
+                    <div>
+                      URL:{" "}
+                      <span className="text-emerald">
+                        {sandboxStatus.sandbox.url ?? "N/A"}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Logs */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Logs</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => checkSandbox(selectedProject.id)}
+                    disabled={sandboxLoading}
+                  >
+                    <RefreshCw
+                      className={`h-3.5 w-3.5 ${sandboxLoading ? "animate-spin" : ""}`}
+                    />
+                  </Button>
+                </div>
+                <div className="bg-zinc-900 text-zinc-100 rounded-lg p-4 text-xs font-mono max-h-96 overflow-y-auto whitespace-pre-wrap">
+                  {sandboxStatus.logs || "No logs available"}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => checkSandbox(selectedProject.id)}
+                  disabled={sandboxLoading}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button
+                  variant="outline"
+                  className="text-warm-red hover:text-warm-red"
+                  onClick={() => destroySandbox(selectedProject.id)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Destroy
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

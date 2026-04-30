@@ -6,6 +6,17 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  turbopack: {},
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Mark dockerode/ssh2 native modules as external for webpack
+      config.externals = config.externals || [];
+      if (Array.isArray(config.externals)) {
+        config.externals.push("dockerode", "ssh2");
+      }
+    }
+    return config;
+  },
   images: {
     remotePatterns: [
       {
@@ -18,6 +29,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  serverExternalPackages: ["dockerode", "ssh2"],
 };
 
 export default nextConfig;
