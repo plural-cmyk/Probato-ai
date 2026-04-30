@@ -1,5 +1,6 @@
 "use client";
 
+import { signIn } from "next-auth/react";
 import { motion } from "framer-motion";
 import {
   Bug,
@@ -9,7 +10,6 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertTriangle,
-  Clock,
   Play,
   Code2,
   Shield,
@@ -50,9 +50,7 @@ export default function LandingPage() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-deep-indigo">
               <Bug className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-deep-indigo">
-              Probato
-            </span>
+            <span className="text-xl font-bold text-deep-indigo">Probato</span>
           </div>
           <div className="hidden items-center gap-8 md:flex">
             <a
@@ -84,10 +82,14 @@ export default function LandingPage() {
             <Button
               variant="ghost"
               className="text-sm text-muted-foreground hover:text-deep-indigo"
+              onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
             >
               Sign In
             </Button>
-            <Button className="bg-electric-violet hover:bg-electric-violet/90 text-white text-sm">
+            <Button
+              className="bg-electric-violet hover:bg-electric-violet/90 text-white text-sm"
+              onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
+            >
               <Github className="mr-2 h-4 w-4" />
               Get Started
             </Button>
@@ -146,6 +148,7 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 className="bg-electric-violet hover:bg-electric-violet/90 text-white h-12 px-8 text-base"
+                onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
               >
                 <Github className="mr-2 h-5 w-5" />
                 Start with GitHub
@@ -155,6 +158,11 @@ export default function LandingPage() {
                 variant="outline"
                 size="lg"
                 className="border-white/20 text-white hover:bg-white/10 h-12 px-8 text-base"
+                onClick={() =>
+                  document
+                    .getElementById("how-it-works")
+                    ?.scrollIntoView({ behavior: "smooth" })
+                }
               >
                 See How It Works
               </Button>
@@ -486,6 +494,7 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 className="bg-electric-violet hover:bg-electric-violet/90 text-white h-12 px-8 text-base"
+                onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
               >
                 <Github className="mr-2 h-5 w-5" />
                 Get Started Free
@@ -516,7 +525,7 @@ export default function LandingPage() {
                 Documentation
               </a>
               <a
-                href="#"
+                href="https://github.com/plural-cmyk/Probato-ai"
                 className="text-sm text-muted-foreground hover:text-deep-indigo transition-colors"
               >
                 GitHub

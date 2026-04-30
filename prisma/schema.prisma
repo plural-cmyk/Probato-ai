@@ -1,32 +1,165 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Probato - AI-Powered Autonomous Testing Platform
+// Prisma Schema with NextAuth + Domain Models
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
+
+// ============================================
+// NextAuth Required Models
+// ============================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String  @id @default(cuid())
+  sessionToken String  @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// Probato Domain Models
+// ============================================
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  githubId      String?   @unique
+  githubLogin   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts   Account[]
+  sessions   Session[]
+  projects   Project[]
 }
 
-model Post {
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  repoUrl     String
+  repoName    String
+  branch      String   @default("main")
+  status      String   @default("pending") // pending, cloning, ready, error
+  sandboxId   String?  // Docker container ID
+  sandboxUrl  String?  // URL where sandboxed app is accessible
+  lastRunAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  features  Feature[]
+  testRuns  TestRun[]
+
+  @@index([userId])
+}
+
+model Feature {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // route, component, form, api-endpoint, page
+  path        String?  // File path in repo
+  route       String?  // URL route (for pages/API routes)
+  selector    String?  // Primary CSS selector (for components/forms)
+  description String?
+  priority    Int      @default(0) // For topological sort ordering
+  dependencies String[] @default([]) // Feature IDs this depends on
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  testCases TestCase[]
+
+  @@index([projectId])
+  @@index([type])
+}
+
+model TestRun {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  status    String   @default("pending") // pending, running, passed, failed, error
+  triggeredBy String @default("manual") // manual, auto, auto-heal
+  startedAt DateTime?
+  endedAt   DateTime?
+  logs      String?  // Raw test output
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  projectId  String
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  results    TestResult[]
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model TestResult {
+  id          String   @id @default(cuid())
+  testName    String
+  featureName String?
+  status      String   // passed, failed, skipped, error
+  duration    Int?     // milliseconds
+  error       String?  // Error message if failed
+  screenshot  String?  // Base64 screenshot on failure
+  createdAt   DateTime @default(now())
+
+  testRunId String
+  testRun   TestRun @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  @@index([testRunId])
+  @@index([status])
+}
+
+model TestCase {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  code        String   // Generated Playwright test code
+  selector    String?  // Primary selector used in the test
+  autoHealed  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  featureId String
+  feature   Feature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@index([featureId])
 }
