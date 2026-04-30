@@ -1,72 +1,27 @@
-# Worklog
+# Probato Development Worklog
 
-## Task 7: Fix Phase 0 — Restart and Fix All Issues
-**Date**: 2026-04-30
-**Status**: Completed
+---
+Task ID: 1
+Agent: main
+Task: Milestone 1 - GitHub OAuth + Dashboard
 
-### What was done:
-1. Cloned `plural-cmyk/Probato-ai` repo from GitHub
-2. Diagnosed the root cause of 500 errors: **Foreign key constraint violation** — `Project_userId_fkey` because `demo-user` didn't exist in the `User` table
-3. Created demo user in Neon database via Prisma
-4. Added auto-seed: `ensureDemoUser()` in `/api/projects/route.ts` so fresh deployments work without manual seeding
-5. Added `/api/health` endpoint for diagnostics (shows DB status, env vars, LLM providers)
-6. Added `/api/llm` endpoint for LLM provider status
-7. Improved error handling on all API routes with detailed error messages
-8. Added error banner to landing page when API fails (with retry button)
-9. Added `prisma/seed.ts` for manual database seeding
-10. Updated `.env.example` with clear documentation
-11. Pushed all fixes to GitHub — Vercel auto-deploys successfully
+Work Log:
+- Switched Prisma from SQLite to Neon PostgreSQL
+- Created full domain schema: User, Account, Session, VerificationToken, Project, Feature, TestRun, TestResult, TestCase
+- Configured NextAuth v4 with GitHub provider + PrismaAdapter
+- Built custom sign-in page at /auth/signin with GitHub OAuth button
+- Built dashboard page at /dashboard with user info, project stats, project list
+- Created SessionProvider wrapper component
+- Created API routes: /api/auth/[...nextauth], /api/projects (GET+POST), /api/health
+- Updated landing page to wire Sign In / Get Started buttons to GitHub OAuth
+- Updated next.config.ts for GitHub/Google avatar remote patterns
+- Added custom NextAuth type declarations for githubLogin/githubId
+- Pushed schema to Neon PostgreSQL (prisma db push)
+- Build verified - all routes compile cleanly
+- Force-pushed clean main branch to GitHub
 
-### Verified Endpoints (all working on Vercel):
-- `GET /api/health` → `{"status":"healthy"}` ✅
-- `POST /api/projects` → Creates project with auto-seeded demo user ✅
-- `GET /api/projects` → Lists projects with feature/test counts ✅
-- `POST /api/projects/:id/discover` → Discovers 33 features ✅
-- `GET /api/projects/:id/features` → Lists features by type ✅
-- `POST /api/test-runs` → Creates simulated test run ✅
-- `GET /api/llm` → Shows provider status (fallback provider active) ✅
-- `GET /api/test-runs/:id` → Gets test run with results ✅
-
-### Key Fix:
-The 500 error was caused by `userId: 'demo-user'` not existing in the `User` table (FK constraint). Fixed by:
-1. Creating the demo user in the database
-2. Adding `ensureDemoUser()` that auto-creates the demo user on first project creation
-3. This means fresh Vercel deployments will work without any manual seeding
-
-## Task 5: Generate Technical Blueprint PDF for Probato
-**Date**: 2027-04-27
-**Status**: Completed
-
-### What was done:
-1. Created `/home/z/my-project/download/generate_blueprint.py` - a comprehensive Python script using ReportLab to generate a 26-page Technical Blueprint PDF for Probato
-2. Generated the body PDF with all 12 sections, properly styled tables, and content
-3. Created a cover page HTML file with Probato branding (gradient Deep Indigo to Electric Violet)
-4. Rendered cover page using html2poster.js (Playwright-based)
-5. Merged cover PDF + body PDF using pypdf
-6. Ran quality checks:
-   - `code.sanitize` - passed
-   - `meta.brand` - updated metadata (Title: Probato Technical Blueprint, Author: Z.ai, Creator: Z.ai, Producer: http://z.ai)
-   - `font.check` - 0 issues
-
-### Output:
-- Final PDF: `/home/z/my-project/download/Probato_Technical_Blueprint.pdf` (186KB, 26 pages)
-- Generation script: `/home/z/my-project/download/generate_blueprint.py`
-
-## Task 6: Generate Business Plan PDF for Probato
-**Date**: 2027-04-27
-**Status**: Completed
-
-### What was done:
-1. Created `/home/z/my-project/download/generate_business_plan.py` - a comprehensive Python script using ReportLab to generate a 25-page Business Plan PDF for Probato
-2. Generated the body PDF with all 11 sections (35 subsections), properly styled tables, and content
-3. Created a cover page HTML file with Probato business plan branding (warm earth-tone palette with purple accent)
-4. Rendered cover page using html2poster.js (Playwright-based)
-5. Merged cover PDF + body PDF using pypdf
-6. Ran quality checks:
-   - `code.sanitize` - passed
-   - `meta.brand` - updated metadata
-   - `font.check` - 0 issues
-
-### Output:
-- Final PDF: `/home/z/my-project/download/Probato_Business_Plan.pdf` (244KB, 25 pages)
-- Generation script: `/home/z/my-project/download/generate_business_plan.py`
+Stage Summary:
+- Code pushed to: https://github.com/plural-cmyk/Probato-ai (main branch)
+- Vercel should auto-deploy from this push
+- **BLOCKING**: User must create GitHub OAuth App and set env vars on Vercel before testing
+- Database schema is live on Neon PostgreSQL with all 8 tables created
