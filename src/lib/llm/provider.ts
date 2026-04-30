@@ -59,7 +59,6 @@ export async function analyzeCode(
 
   // Cache the result
   if (analysisCache.size >= CACHE_MAX_SIZE) {
-    // Evict oldest entry
     const oldestKey = analysisCache.keys().next().value;
     if (oldestKey) analysisCache.delete(oldestKey);
   }
@@ -92,7 +91,7 @@ Return a JSON object with exactly this structure:
       "type": "page|component|layout|form|api",
       "file": "${filename ?? "unknown"}",
       "description": "What this component/function does",
-      "selectors": ["CSS selectors that could be used to test this component"]
+      "selectors": ["CSS selectors or data-testid that could be used to test this component"]
     }
   ],
   "routes": [
@@ -126,12 +125,12 @@ Rules:
 }
 
 /**
- * Call the LLM via z-ai-web-dev-sdk
+ * Call the LLM — tries z-ai-web-dev-sdk first, falls back to external API
  */
 async function callLLM(prompt: string): Promise<AnalysisResult> {
+  // Strategy 1: Try z-ai-web-dev-sdk (works in dev environment)
   try {
     const zai = await ZAI.create();
-
     const completion = await zai.chat.completions.create({
       messages: [
         {
@@ -149,26 +148,60 @@ async function callLLM(prompt: string): Promise<AnalysisResult> {
     });
 
     const content = completion.choices[0]?.message?.content ?? "";
-
-    // Parse the JSON response — handle potential markdown wrapping
     const jsonStr = extractJSON(content);
     const result = JSON.parse(jsonStr) as AnalysisResult;
-
     return result;
-  } catch (error) {
-    console.error("LLM call failed:", error);
-    // Return a fallback analysis
-    return {
-      summary: "Analysis failed — LLM provider unavailable",
-      language: "unknown",
-      framework: "unknown",
-      components: [],
-      routes: [],
-      features: [],
-      dependencies: [],
-      suggestions: ["Retry analysis when LLM provider is available"],
-    };
+  } catch (sdkError) {
+    console.warn("z-ai-web-dev-sdk failed, trying external API:", sdkError);
   }
+
+  // Strategy 2: Try external OpenAI-compatible API (for Vercel production)
+  const externalUrl = process.env.LLM_API_URL;
+  const externalKey = process.env.LLM_API_KEY;
+  const externalModel = process.env.LLM_MODEL || "gpt-4o-mini";
+
+  if (externalUrl && externalKey) {
+    try {
+      const response = await fetch(`${externalUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${externalKey}`,
+        },
+        body: JSON.stringify({
+          model: externalModel,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an expert code analyzer. Always respond with valid JSON only. No markdown, no explanations, just the JSON object.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          temperature: 0.1,
+          max_tokens: 4000,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content ?? "";
+        const jsonStr = extractJSON(content);
+        const result = JSON.parse(jsonStr) as AnalysisResult;
+        return result;
+      } else {
+        console.error("External API error:", response.status, await response.text());
+      }
+    } catch (fetchError) {
+      console.error("External API fetch failed:", fetchError);
+    }
+  }
+
+  // Strategy 3: Rule-based fallback analysis (no LLM needed)
+  return fallbackAnalysis(prompt);
 }
 
 /**
@@ -198,9 +231,145 @@ function hashCode(str: string): string {
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash |= 0; // Convert to 32bit integer
+    hash |= 0;
   }
   return Math.abs(hash).toString(36);
+}
+
+/**
+ * Fallback: Rule-based analysis when no LLM is available
+ * Parses the code string to find basic patterns
+ */
+function fallbackAnalysis(prompt: string): AnalysisResult {
+  // Extract the code from the prompt
+  const codeMatch = prompt.match(/```\n?([\s\S]*?)\n?```/);
+  const code = codeMatch ? codeMatch[1] : "";
+
+  const components: ComponentInfo[] = [];
+  const routes: RouteInfo[] = [];
+  const features: FeatureInfo[] = [];
+  const dependencies: string[] = [];
+  const suggestions: string[] = [];
+
+  // Detect language
+  let language = "unknown";
+  let framework = "none";
+  if (code.includes("import React") || code.includes("from 'react'") || code.includes('from "react"')) {
+    language = "TypeScript";
+    dependencies.push("react");
+  }
+  if (code.includes("export default function") || code.includes("export function")) {
+    language = language === "unknown" ? "JavaScript" : language;
+  }
+  if (code.includes("useState") || code.includes("useEffect")) {
+    dependencies.push("react");
+  }
+  if (code.includes("next") || code.includes("Next")) {
+    framework = "Next.js";
+    dependencies.push("next");
+  }
+
+  // Detect components
+  const funcCompMatch = code.match(/export\s+default\s+function\s+(\w+)/);
+  if (funcCompMatch) {
+    const name = funcCompMatch[1];
+    components.push({
+      name,
+      type: "component",
+      description: `React component: ${name}`,
+    });
+
+    features.push({
+      name: name,
+      type: "other",
+      description: `The ${name} component's core functionality`,
+      testPriority: 2,
+    });
+  }
+
+  // Detect data-testid selectors
+  const testIdMatches = code.matchAll(/data-testid=["']([^"']+)["']/g);
+  const selectors: string[] = [];
+  for (const match of testIdMatches) {
+    selectors.push(`[data-testid="${match[1]}"]`);
+  }
+  if (components.length > 0 && selectors.length > 0) {
+    components[0].selectors = selectors;
+  }
+
+  // Detect forms
+  if (code.includes("<form") || code.includes("onSubmit")) {
+    features.push({
+      name: "Form Submission",
+      type: "form",
+      description: "User can submit a form",
+      testPriority: 1,
+    });
+    suggestions.push("Test form submission with valid and invalid inputs");
+    suggestions.push("Test form validation behavior");
+  }
+
+  // Detect API routes
+  const apiRouteMatch = code.match(/(?:GET|POST|PUT|DELETE|PATCH)\s*\(/g);
+  if (apiRouteMatch) {
+    routes.push({
+      path: "/api/endpoint",
+      method: "GET",
+      description: "API endpoint detected in code",
+    });
+    features.push({
+      name: "API Integration",
+      type: "api",
+      description: "The component interacts with an API",
+      testPriority: 2,
+    });
+  }
+
+  // Detect event handlers
+  if (code.includes("onClick") || code.includes("onChange")) {
+    suggestions.push("Test click interactions and user events");
+  }
+
+  // Detect state management
+  if (code.includes("useState")) {
+    features.push({
+      name: "State Management",
+      type: "other",
+      description: "Component manages internal state",
+      testPriority: 2,
+    });
+    suggestions.push("Test state changes render correctly");
+  }
+
+  // Extract import dependencies
+  const importMatches = code.matchAll(/from\s+['"]([^'"]+)['"]/g);
+  for (const match of importMatches) {
+    const dep = match[1];
+    if (!dep.startsWith(".") && !dependencies.includes(dep)) {
+      dependencies.push(dep);
+    }
+  }
+
+  const summary = components.length > 0
+    ? `A ${framework !== "none" ? framework : ""} ${language} component (${components.map(c => c.name).join(", ")}) with ${features.length} testable feature(s).`
+    : `A ${language} code snippet. ${features.length > 0 ? `Found ${features.length} testable feature(s).` : "No obvious testable features detected."}`;
+
+  if (suggestions.length === 0) {
+    suggestions.push("Consider adding data-testid attributes for better test targeting");
+    suggestions.push("Test the component renders without errors");
+    suggestions.push("Test user interactions with the component");
+  }
+
+  return {
+    summary,
+    language: language || "unknown",
+    framework: framework || "none",
+    components,
+    routes,
+    features,
+    dependencies: [...new Set(dependencies)],
+    suggestions,
+  };
 }
 
 /**
