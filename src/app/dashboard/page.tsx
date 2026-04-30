@@ -22,6 +22,8 @@ import {
   Globe,
   Camera,
   Link2,
+  BrainCircuit,
+  Code2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,6 +90,66 @@ interface SandboxStatus {
   logs: string;
 }
 
+const SAMPLE_CODE = `import { useState } from 'react';
+
+interface Todo {
+  id: number;
+  text: string;
+  completed: boolean;
+}
+
+export default function TodoApp() {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [input, setInput] = useState('');
+
+  function addTodo() {
+    if (!input.trim()) return;
+    setTodos([...todos, { id: Date.now(), text: input, completed: false }]);
+    setInput('');
+  }
+
+  function toggleTodo(id: number) {
+    setTodos(todos.map(t =>
+      t.id === id ? { ...t, completed: !t.completed } : t
+    ));
+  }
+
+  function deleteTodo(id: number) {
+    setTodos(todos.filter(t => t.id !== id));
+  }
+
+  return (
+    <div className="max-w-md mx-auto p-4">
+      <h1>Todo App</h1>
+      <form onSubmit={(e) => { e.preventDefault(); addTodo(); }}>
+        <input
+          data-testid="todo-input"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Add a todo..."
+        />
+        <button data-testid="add-todo-btn" type="submit">Add</button>
+      </form>
+      <ul data-testid="todo-list">
+        {todos.map(todo => (
+          <li key={todo.id} data-testid={\`todo-item-\${todo.id}\`}>
+            <input
+              type="checkbox"
+              checked={todo.completed}
+              onChange={() => toggleTodo(todo.id)}
+            />
+            <span style={{ textDecoration: todo.completed ? 'line-through' : 'none' }}>
+              {todo.text}
+            </span>
+            <button onClick={() => deleteTodo(todo.id)}>Delete</button>
+          </li>
+        ))}
+      </ul>
+      <p data-testid="todo-count">{todos.filter(t => !t.completed).length} items left</p>
+    </div>
+  );
+}`;
+
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -110,6 +172,18 @@ export default function DashboardPage() {
     screenshot: string;
     links: string[];
     timestamp: string;
+  } | null>(null);
+  const [codeSnippet, setCodeSnippet] = useState(SAMPLE_CODE);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<{
+    summary: string;
+    language: string;
+    framework: string;
+    components: { name: string; type: string; description: string; selectors?: string[] }[];
+    routes: { path: string; method?: string; description: string }[];
+    features: { name: string; type: string; description: string; testPriority: number }[];
+    dependencies: string[];
+    suggestions: string[];
   } | null>(null);
 
   useEffect(() => {
@@ -255,6 +329,31 @@ export default function DashboardPage() {
     }
   }
 
+  async function analyzeCodeSnippet() {
+    if (!codeSnippet.trim()) return;
+    setAnalyzing(true);
+    setAnalysisResult(null);
+    try {
+      const res = await fetch("/api/llm/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: codeSnippet, filename: "App.tsx" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAnalysisResult(data.analysis);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to analyze code");
+      }
+    } catch (error) {
+      console.error("Failed to analyze:", error);
+      alert("Failed to analyze code. Please try again.");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -287,9 +386,7 @@ export default function DashboardPage() {
       <nav className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-deep-indigo">
-              <Bug className="h-5 w-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="Probato" className="h-8 w-8 rounded-lg" />
             <span className="text-xl font-bold text-deep-indigo">Probato</span>
             <Badge variant="secondary" className="text-xs">
               Dashboard
@@ -476,6 +573,178 @@ export default function DashboardPage() {
                 </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* LLM Code Analysis Section */}
+        <Card className="mb-8 border-border/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald/10">
+                <BrainCircuit className="h-4 w-4 text-emerald" />
+              </div>
+              <div>
+                <CardTitle className="text-base">LLM Code Analysis</CardTitle>
+                <CardDescription className="text-xs">
+                  Paste code and let AI discover testable features
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <textarea
+                  className="w-full h-48 rounded-lg border bg-zinc-950 text-zinc-100 p-4 font-mono text-xs resize-y focus:outline-none focus:ring-2 focus:ring-electric-violet"
+                  value={codeSnippet}
+                  onChange={(e) => setCodeSnippet(e.target.value)}
+                  placeholder="Paste your code here..."
+                />
+              </div>
+              <Button
+                className="bg-emerald hover:bg-emerald/90 text-white"
+                onClick={analyzeCodeSnippet}
+                disabled={analyzing || !codeSnippet.trim()}
+              >
+                {analyzing ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <BrainCircuit className="mr-1.5 h-4 w-4" />
+                )}
+                {analyzing ? "Analyzing..." : "Analyze Code"}
+              </Button>
+
+              {analysisResult && (
+                <div className="space-y-4 pt-2">
+                  {/* Summary */}
+                  <div className="rounded-lg border p-4 bg-white">
+                    <h4 className="text-sm font-semibold text-deep-indigo mb-2">Summary</h4>
+                    <p className="text-sm text-muted-foreground">{analysisResult.summary}</p>
+                    <div className="flex gap-2 mt-3">
+                      <Badge variant="secondary">{analysisResult.language}</Badge>
+                      <Badge variant="secondary">{analysisResult.framework}</Badge>
+                    </div>
+                  </div>
+
+                  {/* Components */}
+                  {analysisResult.components.length > 0 && (
+                    <div className="rounded-lg border p-4 bg-white">
+                      <h4 className="text-sm font-semibold text-deep-indigo mb-3">
+                        <Code2 className="inline h-4 w-4 mr-1" />
+                        Components ({analysisResult.components.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {analysisResult.components.map((comp, i) => (
+                          <div key={i} className="flex items-start gap-2 text-sm">
+                            <Badge variant="outline" className="shrink-0 text-xs">
+                              {comp.type}
+                            </Badge>
+                            <div>
+                              <span className="font-medium">{comp.name}</span>
+                              <span className="text-muted-foreground"> — {comp.description}</span>
+                              {comp.selectors && comp.selectors.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {comp.selectors.map((s, j) => (
+                                    <code key={j} className="text-xs bg-zinc-100 px-1.5 py-0.5 rounded">
+                                      {s}
+                                    </code>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Routes */}
+                  {analysisResult.routes.length > 0 && (
+                    <div className="rounded-lg border p-4 bg-white">
+                      <h4 className="text-sm font-semibold text-deep-indigo mb-3">Routes</h4>
+                      <div className="space-y-2">
+                        {analysisResult.routes.map((route, i) => (
+                          <div key={i} className="flex items-center gap-2 text-sm">
+                            {route.method && (
+                              <Badge variant="secondary" className="text-xs font-mono">
+                                {route.method}
+                              </Badge>
+                            )}
+                            <code className="text-xs bg-zinc-100 px-1.5 py-0.5 rounded">
+                              {route.path}
+                            </code>
+                            <span className="text-muted-foreground">{route.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Features */}
+                  {analysisResult.features.length > 0 && (
+                    <div className="rounded-lg border p-4 bg-white">
+                      <h4 className="text-sm font-semibold text-deep-indigo mb-3">Testable Features</h4>
+                      <div className="space-y-2">
+                        {analysisResult.features
+                          .sort((a, b) => a.testPriority - b.testPriority)
+                          .map((feat, i) => (
+                            <div key={i} className="flex items-start gap-2 text-sm">
+                              <Badge
+                                variant="outline"
+                                className={`shrink-0 text-xs ${
+                                  feat.testPriority === 1
+                                    ? "bg-warm-red/10 text-warm-red border-warm-red/20"
+                                    : feat.testPriority === 2
+                                    ? "bg-amber/10 text-amber border-amber/20"
+                                    : "bg-emerald/10 text-emerald border-emerald/20"
+                                }`}
+                              >
+                                P{feat.testPriority}
+                              </Badge>
+                              <div>
+                                <span className="font-medium">{feat.name}</span>
+                                <span className="text-muted-foreground"> — {feat.description}</span>
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  {feat.type}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dependencies */}
+                  {analysisResult.dependencies.length > 0 && (
+                    <div className="rounded-lg border p-4 bg-white">
+                      <h4 className="text-sm font-semibold text-deep-indigo mb-2">Dependencies</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {analysisResult.dependencies.map((dep, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs font-mono">
+                            {dep}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Suggestions */}
+                  {analysisResult.suggestions.length > 0 && (
+                    <div className="rounded-lg border p-4 bg-white">
+                      <h4 className="text-sm font-semibold text-deep-indigo mb-2">Test Suggestions</h4>
+                      <ul className="space-y-1.5">
+                        {analysisResult.suggestions.map((s, i) => (
+                          <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                            <span className="text-emerald mt-0.5">•</span>
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 

@@ -47,9 +47,7 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-deep-indigo">
-              <Bug className="h-5 w-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="Probato" className="h-8 w-8 rounded-lg" />
             <span className="text-xl font-bold text-deep-indigo">Probato</span>
           </div>
           <div className="hidden items-center gap-8 md:flex">
@@ -510,9 +508,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-deep-indigo">
-                <Bug className="h-4 w-4 text-white" />
-              </div>
+              <img src="/logo.png" alt="Probato" className="h-7 w-7 rounded-md" />
               <span className="text-sm font-semibold text-deep-indigo">
                 Probato
               </span>

@@ -2,7 +2,7 @@
 
 import { signIn, getProviders } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { Bug, Github, ArrowLeft } from "lucide-react";
+import { Github, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,9 +28,11 @@ export default function SignInPage() {
       <div className="relative w-full max-w-md px-4">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-deep-indigo">
-            <Bug className="h-8 w-8 text-white" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Probato"
+            className="mx-auto mb-4 h-16 w-16 rounded-xl"
+          />
           <h1 className="text-2xl font-bold text-deep-indigo">Probato</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             AI-Powered Autonomous Testing
