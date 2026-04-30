@@ -19,6 +19,9 @@ import {
   Terminal,
   X,
   Play,
+  Globe,
+  Camera,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -99,6 +102,15 @@ export default function DashboardPage() {
   const [sandboxStatus, setSandboxStatus] = useState<SandboxStatus | null>(null);
   const [sandboxLoading, setSandboxLoading] = useState(false);
   const [launching, setLaunching] = useState(false);
+  const [browseUrl, setBrowseUrl] = useState("https://probato-ai.vercel.app");
+  const [browsing, setBrowsing] = useState(false);
+  const [browseResult, setBrowseResult] = useState<{
+    title: string;
+    url: string;
+    screenshot: string;
+    links: string[];
+    timestamp: string;
+  } | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -215,6 +227,31 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error("Failed to destroy sandbox:", error);
+    }
+  }
+
+  async function browsePage() {
+    if (!browseUrl.trim()) return;
+    setBrowsing(true);
+    setBrowseResult(null);
+    try {
+      const res = await fetch("/api/browse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: browseUrl, waitFor: 3000 }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBrowseResult(data);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to browse page");
+      }
+    } catch (error) {
+      console.error("Failed to browse:", error);
+      alert("Failed to browse page. The Chromium browser may not be available on this deployment.");
+    } finally {
+      setBrowsing(false);
     }
   }
 
@@ -352,6 +389,95 @@ export default function DashboardPage() {
             </CardHeader>
           </Card>
         </div>
+
+        {/* Browser Test Section */}
+        <Card className="mb-8 border-border/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-electric-violet/10">
+                <Globe className="h-4 w-4 text-electric-violet" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Browser Automation</CardTitle>
+                <CardDescription className="text-xs">
+                  Launch a headless browser and capture screenshots of any page
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4">
+              <Input
+                placeholder="https://example.com"
+                value={browseUrl}
+                onChange={(e) => setBrowseUrl(e.target.value)}
+                className="font-mono text-sm"
+                onKeyDown={(e) => e.key === "Enter" && browsePage()}
+              />
+              <Button
+                className="bg-electric-violet hover:bg-electric-violet/90 text-white shrink-0"
+                onClick={browsePage}
+                disabled={browsing || !browseUrl.trim()}
+              >
+                {browsing ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="mr-1.5 h-4 w-4" />
+                )}
+                {browsing ? "Browsing..." : "Capture"}
+              </Button>
+            </div>
+
+            {browseResult && (
+              <div className="space-y-3">
+                {/* Screenshot */}
+                <div className="rounded-lg border overflow-hidden bg-zinc-100">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-zinc-200/60 border-b text-xs text-muted-foreground">
+                    <Globe className="h-3 w-3" />
+                    <span className="font-mono truncate">{browseResult.url}</span>
+                    <span className="ml-auto">{browseResult.title}</span>
+                  </div>
+                  <img
+                    src={`data:image/png;base64,${browseResult.screenshot}`}
+                    alt="Page screenshot"
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Links found */}
+                {browseResult.links.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
+                      <Link2 className="h-3 w-3" />
+                      {browseResult.links.length} links discovered
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {browseResult.links.slice(0, 20).map((link, i) => (
+                        <Badge
+                          key={i}
+                          variant="secondary"
+                          className="text-xs font-mono truncate max-w-[200px]"
+                          title={link}
+                        >
+                          {link.replace(/^https?:\/\//, "").split("/")[0]}
+                        </Badge>
+                      ))}
+                      {browseResult.links.length > 20 && (
+                        <Badge variant="secondary" className="text-xs">
+                          +{browseResult.links.length - 20} more
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Captured at {new Date(browseResult.timestamp).toLocaleTimeString()}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Projects Section */}
         <div className="flex items-center justify-between">

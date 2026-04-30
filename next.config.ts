@@ -9,7 +9,6 @@ const nextConfig: NextConfig = {
   turbopack: {},
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Mark dockerode/ssh2 native modules as external for webpack
       config.externals = config.externals || [];
       if (Array.isArray(config.externals)) {
         config.externals.push("dockerode", "ssh2");
@@ -29,7 +28,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ["dockerode", "ssh2"],
+  serverExternalPackages: ["dockerode", "ssh2", "@sparticuz/chromium"],
 };
 
 export default nextConfig;
