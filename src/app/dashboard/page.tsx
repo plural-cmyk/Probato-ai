@@ -361,7 +361,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error("Failed to browse:", error);
-      alert("Failed to browse page. The Chromium browser may not be available on this deployment.");
+      alert("Failed to browse page. Check /api/browser/check for browser diagnostics.");
     } finally {
       setBrowsing(false);
     }
@@ -412,11 +412,11 @@ export default function DashboardPage() {
         setTestResult(data);
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to run test");
+        alert(data.details || data.error || "Failed to run test");
       }
     } catch (error) {
       console.error("Failed to run test:", error);
-      alert("Failed to run test. The Chromium browser may not be available on this deployment.");
+      alert("Failed to run test. Check if the Chromium browser is available on this deployment. Visit /api/browser/check for diagnostics.");
     } finally {
       setTestRunning(false);
     }

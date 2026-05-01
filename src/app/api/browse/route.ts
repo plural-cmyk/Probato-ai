@@ -3,6 +3,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { browsePage, browseMultiplePages } from "@/lib/browser/chromium";
 
+// Vercel serverless function config — Chromium needs more time and memory
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 // POST /api/browse — Browse a URL and return screenshot + metadata
 export async function POST(request: NextRequest) {
   try {

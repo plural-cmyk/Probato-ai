@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // NOTE: "standalone" output is for Docker/self-hosted deployments.
+  // When deploying to Vercel, the platform uses its own builder.
   output: "standalone",
   typescript: {
     ignoreBuildErrors: true,
@@ -11,6 +13,7 @@ const nextConfig: NextConfig = {
     if (isServer) {
       config.externals = config.externals || [];
       if (Array.isArray(config.externals)) {
+        // dockerode & ssh2 have native deps that can't be bundled for serverless
         config.externals.push("dockerode", "ssh2");
       }
     }
@@ -28,7 +31,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ["dockerode", "ssh2", "@sparticuz/chromium"],
+  // @sparticuz/chromium and puppeteer-core must be external so Vercel
+  // includes them in node_modules (not webpack-bundled) — the binary is too large for webpack
+  serverExternalPackages: ["dockerode", "ssh2", "@sparticuz/chromium", "puppeteer-core"],
 };
 
 export default nextConfig;

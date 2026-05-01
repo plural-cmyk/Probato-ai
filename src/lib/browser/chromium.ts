@@ -22,21 +22,68 @@ export interface BrowseOptions {
 
 /**
  * Launch a headless Chromium browser on serverless (Vercel) or local
+ *
+ * Strategy:
+ * 1. On Vercel: use @sparticuz/chromium (serverless-optimized Chromium binary)
+ * 2. Local dev: try to find a local Chrome/Chromium installation
+ * 3. Fallback: use @sparticuz/chromium even locally
  */
 export async function launchBrowser(): Promise<Browser> {
   const isVercel = !!process.env.VERCEL;
 
+  console.log(`[Chromium] Launching browser (Vercel: ${isVercel}, Node: ${process.version})`);
+
   if (isVercel) {
-    // Serverless: use @sparticuz/chromium
-    return puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-    });
+    return launchVercelBrowser();
   }
 
-  // Local dev: try to find a local Chrome/Chromium installation
+  return launchLocalBrowser();
+}
+
+/**
+ * Launch Chromium on Vercel serverless using @sparticuz/chromium
+ */
+async function launchVercelBrowser(): Promise<Browser> {
+  try {
+    const executablePath = await chromium.executablePath();
+    console.log(`[Chromium] Vercel executable path: ${executablePath ? 'resolved' : 'missing'}`);
+
+    if (!executablePath) {
+      throw new Error("Chromium executable path not found — @sparticuz/chromium may not be bundled correctly");
+    }
+
+    const browser = await puppeteer.launch({
+      args: [
+        ...chromium.args,
+        "--hide-scrollbars",
+        "--disable-web-security",
+        "--disable-features=IsolateOrigins,site-per-process",
+      ],
+      defaultViewport: chromium.defaultViewport,
+      executablePath,
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
+    });
+
+    console.log(`[Chromium] Browser launched successfully on Vercel`);
+    return browser;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[Chromium] Vercel launch failed: ${message}`);
+
+    // Provide a helpful error message
+    throw new Error(
+      `Chromium launch failed on Vercel: ${message}. ` +
+      `This usually means the @sparticuz/chromium binary was not bundled correctly. ` +
+      `Ensure the function has enough memory (2048MB+) and maxDuration (60s+).`
+    );
+  }
+}
+
+/**
+ * Launch Chromium locally — try local installations first, then fall back to @sparticuz/chromium
+ */
+async function launchLocalBrowser(): Promise<Browser> {
   let executablePath: string | undefined;
   const possiblePaths = [
     "/usr/bin/chromium-browser",
@@ -52,6 +99,7 @@ export async function launchBrowser(): Promise<Browser> {
     try {
       if (fs.existsSync(path)) {
         executablePath = path;
+        console.log(`[Chromium] Found local browser at: ${path}`);
         break;
       }
     } catch {
@@ -61,10 +109,21 @@ export async function launchBrowser(): Promise<Browser> {
 
   if (!executablePath) {
     // Fall back to @sparticuz/chromium even locally
-    executablePath = await chromium.executablePath();
+    console.log(`[Chromium] No local browser found, trying @sparticuz/chromium`);
+    try {
+      executablePath = await chromium.executablePath();
+    } catch (err) {
+      console.warn(`[Chromium] @sparticuz/chromium fallback failed:`, err);
+    }
   }
 
-  return puppeteer.launch({
+  if (!executablePath) {
+    throw new Error(
+      "No Chromium/Chrome browser found. Install Chrome or ensure @sparticuz/chromium is available."
+    );
+  }
+
+  const browser = await puppeteer.launch({
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -72,11 +131,47 @@ export async function launchBrowser(): Promise<Browser> {
       "--disable-gpu",
       "--single-process",
       "--no-zygote",
+      "--hide-scrollbars",
     ],
     defaultViewport: { width: 1280, height: 720 },
     executablePath,
     headless: true,
   });
+
+  console.log(`[Chromium] Local browser launched successfully`);
+  return browser;
+}
+
+/**
+ * Check if a Chromium browser is available for launch
+ * Returns diagnostics about the browser environment
+ */
+export async function checkBrowserAvailability(): Promise<{
+  available: boolean;
+  isVercel: boolean;
+  nodeVersion: string;
+  executablePath: string | null;
+  error?: string;
+}> {
+  const isVercel = !!process.env.VERCEL;
+
+  try {
+    const executablePath = await chromium.executablePath();
+    return {
+      available: !!executablePath,
+      isVercel,
+      nodeVersion: process.version,
+      executablePath: executablePath ?? null,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      isVercel,
+      nodeVersion: process.version,
+      executablePath: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 /**
