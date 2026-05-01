@@ -24,6 +24,12 @@ import {
   Link2,
   BrainCircuit,
   Code2,
+  Zap,
+  Eye,
+  ChevronDown,
+  ChevronRight,
+  MousePointerClick,
+  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -185,6 +191,38 @@ export default function DashboardPage() {
     dependencies: string[];
     suggestions: string[];
   } | null>(null);
+
+  // Test Runner state
+  const [testUrl, setTestUrl] = useState("https://probato-ai.vercel.app");
+  const [testPreset, setTestPreset] = useState("smoke");
+  const [testRunning, setTestRunning] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    testRunId?: string;
+    result: {
+      status: string;
+      steps: {
+        action: { type: string; label: string };
+        status: string;
+        screenshot?: string;
+        actualText?: string;
+        actualUrl?: string;
+        error?: string;
+        duration: number;
+        timestamp: string;
+      }[];
+      startedAt: string;
+      endedAt: string;
+      duration: number;
+      summary: {
+        total: number;
+        passed: number;
+        failed: number;
+        skipped: number;
+        errors: number;
+      };
+    };
+  } | null>(null);
+  const [expandedStep, setExpandedStep] = useState<number | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -351,6 +389,36 @@ export default function DashboardPage() {
       alert("Failed to analyze code. Please try again.");
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  async function runTest() {
+    if (!testUrl.trim()) return;
+    setTestRunning(true);
+    setTestResult(null);
+    setExpandedStep(null);
+    try {
+      const res = await fetch("/api/test/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: testUrl,
+          preset: testPreset,
+          screenshotEveryStep: true,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTestResult(data);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to run test");
+      }
+    } catch (error) {
+      console.error("Failed to run test:", error);
+      alert("Failed to run test. The Chromium browser may not be available on this deployment.");
+    } finally {
+      setTestRunning(false);
     }
   }
 
@@ -573,6 +641,226 @@ export default function DashboardPage() {
                 </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Test Runner Section */}
+        <Card className="mb-8 border-border/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-deep-indigo/10">
+                <Zap className="h-4 w-4 text-deep-indigo" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Test Executor</CardTitle>
+                <CardDescription className="text-xs">
+                  Run automated browser tests against any URL
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Input row: URL + Preset + Run button */}
+              <div className="flex gap-2 flex-col sm:flex-row">
+                <Input
+                  placeholder="https://your-app.com"
+                  value={testUrl}
+                  onChange={(e) => setTestUrl(e.target.value)}
+                  className="font-mono text-sm sm:flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && runTest()}
+                />
+                <Select value={testPreset} onValueChange={setTestPreset}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="smoke">Smoke Test</SelectItem>
+                    <SelectItem value="navigation">Navigation</SelectItem>
+                    <SelectItem value="login">Login Flow</SelectItem>
+                    <SelectItem value="form">Form Test</SelectItem>
+                    <SelectItem value="full-page-screenshot">Full Screenshot</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  className="bg-deep-indigo hover:bg-deep-indigo/90 text-white shrink-0"
+                  onClick={runTest}
+                  disabled={testRunning || !testUrl.trim()}
+                >
+                  {testRunning ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="mr-1.5 h-4 w-4" />
+                  )}
+                  {testRunning ? "Running..." : "Run Test"}
+                </Button>
+              </div>
+
+              {/* Preset description */}
+              <div className="text-xs text-muted-foreground">
+                {testPreset === "smoke" && "Loads the page, waits for body, takes screenshot, and reads the main heading."}
+                {testPreset === "navigation" && "Loads the page, finds links, verifies navigation elements exist."}
+                {testPreset === "login" && "Navigates to login, fills credentials, submits, and verifies redirect."}
+                {testPreset === "form" && "Finds form elements, fills inputs, takes screenshots of each state."}
+                {testPreset === "full-page-screenshot" && "Navigates to the page and captures a full-page screenshot."}
+              </div>
+
+              {/* Test Results */}
+              {testResult && (
+                <div className="space-y-4 pt-2">
+                  {/* Summary Bar */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Badge
+                      variant="outline"
+                      className={`text-sm px-3 py-1 ${
+                        testResult.result.status === "passed"
+                          ? "bg-emerald/10 text-emerald border-emerald/20"
+                          : testResult.result.status === "failed"
+                          ? "bg-warm-red/10 text-warm-red border-warm-red/20"
+                          : "bg-amber/10 text-amber border-amber/20"
+                      }`}
+                    >
+                      {testResult.result.status === "passed" ? (
+                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                      ) : (
+                        <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      {testResult.result.status.toUpperCase()}
+                    </Badge>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Timer className="h-3.5 w-3.5" />
+                      {(testResult.result.duration / 1000).toFixed(1)}s
+                    </div>
+                    <div className="flex gap-1.5 text-xs">
+                      <Badge variant="secondary" className="text-emerald">
+                        {testResult.result.summary.passed} passed
+                      </Badge>
+                      <Badge variant="secondary" className="text-warm-red">
+                        {testResult.result.summary.failed} failed
+                      </Badge>
+                      {testResult.result.summary.skipped > 0 && (
+                        <Badge variant="secondary">
+                          {testResult.result.summary.skipped} skipped
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Step-by-step action log */}
+                  <div className="space-y-1.5">
+                    <h4 className="text-sm font-semibold text-deep-indigo flex items-center gap-1.5">
+                      <MousePointerClick className="h-4 w-4" />
+                      Action Log ({testResult.result.steps.length} steps)
+                    </h4>
+                    <div className="space-y-1">
+                      {testResult.result.steps.map((step, i) => (
+                        <div key={i} className="rounded-lg border bg-white">
+                          {/* Step header - clickable to expand */}
+                          <button
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-zinc-50 transition-colors"
+                            onClick={() =>
+                              setExpandedStep(expandedStep === i ? null : i)
+                            }
+                          >
+                            {/* Status icon */}
+                            {step.status === "passed" ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald shrink-0" />
+                            ) : step.status === "failed" ? (
+                              <AlertTriangle className="h-4 w-4 text-warm-red shrink-0" />
+                            ) : step.status === "skipped" ? (
+                              <Clock className="h-4 w-4 text-zinc-400 shrink-0" />
+                            ) : (
+                              <AlertTriangle className="h-4 w-4 text-amber shrink-0" />
+                            )}
+
+                            {/* Step number */}
+                            <span className="text-xs font-mono text-muted-foreground w-6 shrink-0">
+                              {i + 1}.
+                            </span>
+
+                            {/* Action type badge */}
+                            <Badge variant="outline" className="text-xs shrink-0 capitalize">
+                              {step.action.type}
+                            </Badge>
+
+                            {/* Action label */}
+                            <span className="text-sm truncate flex-1">
+                              {step.action.label}
+                            </span>
+
+                            {/* Duration */}
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {step.duration}ms
+                            </span>
+
+                            {/* Expand chevron */}
+                            {(step.screenshot || step.error || step.actualText) && (
+                              expandedStep === i ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                              )
+                            )}
+                          </button>
+
+                          {/* Expanded details */}
+                          {expandedStep === i && (
+                            <div className="border-t px-3 py-3 space-y-3">
+                              {/* Screenshot */}
+                              {step.screenshot && (
+                                <div>
+                                  <div className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
+                                    <Camera className="h-3 w-3" />
+                                    Screenshot
+                                  </div>
+                                  <div className="rounded-lg border overflow-hidden bg-zinc-100">
+                                    <img
+                                      src={`data:image/png;base64,${step.screenshot}`}
+                                      alt={`Step ${i + 1} screenshot`}
+                                      className="w-full max-h-80 object-contain"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Error */}
+                              {step.error && (
+                                <div>
+                                  <div className="text-xs font-medium text-warm-red mb-1">Error</div>
+                                  <div className="bg-warm-red/5 border border-warm-red/20 rounded-lg p-3 text-sm text-warm-red font-mono">
+                                    {step.error}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Actual text read */}
+                              {step.actualText && (
+                                <div>
+                                  <div className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                                    <Eye className="h-3 w-3" />
+                                    Text Read
+                                  </div>
+                                  <div className="bg-zinc-50 border rounded-lg p-3 text-sm font-mono">
+                                    {step.actualText}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* URL after step */}
+                              {step.actualUrl && (
+                                <div className="text-xs text-muted-foreground font-mono truncate">
+                                  URL: {step.actualUrl}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
