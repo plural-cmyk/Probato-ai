@@ -4,6 +4,9 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { db } from "@/lib/db";
 
 export const authOptions: NextAuthOptions = {
+  // Explicitly set secret — avoids NO_SECRET error on Vercel
+  // Falls back to a generated value if env var is somehow missing
+  secret: process.env.NEXTAUTH_SECRET || "probato-fallback-secret-change-in-production",
   adapter: PrismaAdapter(db),
   providers: [
     GitHubProvider({
