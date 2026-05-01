@@ -16,7 +16,7 @@
  */
 
 import { Browser, Page, ElementHandle } from "puppeteer-core";
-import { getBrowserInstance, cleanupBrowser, ManagedBrowser } from "@/lib/browser/chromium";
+import { getBrowserInstance, cleanupBrowser, ManagedBrowser, DEFAULT_ACTION_TIMEOUT } from "@/lib/browser/chromium";
 import {
   TestAction,
   TestRunConfig,
@@ -73,13 +73,18 @@ export async function executeTestRun(config: TestRunConfig): Promise<TestRunResu
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     );
 
+    // Set short default timeout for Vercel serverless compatibility
+    const actionTimeout = Math.min(config.timeout ?? DEFAULT_ACTION_TIMEOUT, DEFAULT_ACTION_TIMEOUT);
+    page.setDefaultTimeout(actionTimeout);
+    page.setDefaultNavigationTimeout(actionTimeout);
+
     // Execute each action
     for (let i = 0; i < Math.min(config.actions.length, maxSteps); i++) {
       const action = config.actions[i];
       const stepStart = Date.now();
 
       try {
-        const result = await executeAction(page, action, config.timeout ?? 15000);
+        const result = await executeAction(page, action, actionTimeout);
 
         // Auto-screenshot after every step if enabled
         if (screenshotEveryStep && !result.screenshot && result.status === "passed") {
@@ -227,7 +232,7 @@ async function executeAction(
       case "waitForNavigation":
         await page.waitForNavigation({
           timeout: action.timeout ?? defaultTimeout,
-          waitUntil: "networkidle2",
+          waitUntil: "domcontentloaded", // Faster for Vercel
         });
         break;
 
@@ -334,7 +339,7 @@ async function executeAction(
 
 async function executeNavigate(page: Page, action: NavigateAction, timeout: number): Promise<void> {
   await page.goto(action.url, {
-    waitUntil: "networkidle2",
+    waitUntil: "domcontentloaded", // Faster than networkidle2 for Vercel
     timeout,
   });
 }
@@ -345,8 +350,8 @@ async function executeClick(page: Page, action: ClickAction, timeout: number): P
     throw new Error(`Element not found for click: ${describeSelector(action.selector)}`);
   }
   await element.click();
-  // Brief settle time after click
-  await page.waitForNetworkIdle({ timeout: 5000 }).catch(() => {});
+  // Brief settle time after click (short for Vercel)
+  await page.waitForNetworkIdle({ timeout: 2000 }).catch(() => {});
 }
 
 async function executeFill(page: Page, action: FillAction, timeout: number): Promise<void> {
@@ -361,7 +366,7 @@ async function executeFill(page: Page, action: FillAction, timeout: number): Pro
     await element.press("Backspace");
   }
 
-  await element.type(action.value, { delay: 30 }); // Typing delay for realism
+  await element.type(action.value, { delay: 10 }); // Fast typing for Vercel
 }
 
 async function executeSelect(page: Page, action: SelectAction, timeout: number): Promise<void> {
@@ -408,8 +413,8 @@ async function executeSubmit(page: Page, action: SubmitAction, timeout: number):
     await element.click();
   }
 
-  // Wait for navigation after submit
-  await page.waitForNavigation({ timeout: 10000, waitUntil: "networkidle2" }).catch(() => {});
+  // Wait for navigation after submit (short for Vercel)
+  await page.waitForNavigation({ timeout: 3000, waitUntil: "domcontentloaded" }).catch(() => {});
 }
 
 async function executePress(page: Page, action: PressAction, timeout: number): Promise<void> {

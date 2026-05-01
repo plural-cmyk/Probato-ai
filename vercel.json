@@ -1,11 +1,9 @@
 {
   "functions": {
     "src/app/api/browse/route.ts": {
-      "maxDuration": 60,
       "memory": 2048
     },
     "src/app/api/test/run/route.ts": {
-      "maxDuration": 120,
       "memory": 2048
     }
   }

@@ -373,7 +373,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error("Failed to browse:", error);
-      alert("Failed to browse page. Check /api/browser/check for browser diagnostics.");
+      alert("Failed to browse page. The function may have timed out or the browser service is unavailable.");
     } finally {
       setBrowsing(false);
     }
@@ -424,11 +424,13 @@ export default function DashboardPage() {
         setTestResult(data);
       } else {
         const data = await res.json();
-        alert(data.details || data.error || "Failed to run test");
+        // Show the actual error details from the server
+        const errorMsg = data.details || data.error || "Failed to run test";
+        alert(errorMsg);
       }
     } catch (error) {
       console.error("Failed to run test:", error);
-      alert("Failed to run test. Check if the Chromium browser is available on this deployment. Visit /api/browser/check for diagnostics.");
+      alert("Request failed — the function may have timed out. On Vercel Hobby plan, tests have a 10-second limit.");
     } finally {
       setTestRunning(false);
     }

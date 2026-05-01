@@ -5,10 +5,14 @@
  * or falls back to local/@sparticuz/chromium.
  *
  * Priority:
- * 1. BROWSER_WS_ENDPOINT env → connect to remote Chrome (Browserless, etc.)
+ * 1. BROWSER_WS_ENDPOINT env → connect to remote Chrome
  * 2. BROWSERLESS_TOKEN env → auto-construct Browserless WebSocket URL
  * 3. On Vercel → try @sparticuz/chromium (often fails on Hobby plan)
  * 4. Local dev → try local Chrome/Chromium installation
+ *
+ * IMPORTANT: Vercel Hobby plan has a 10-second serverless function timeout.
+ * All browser operations must complete within ~8 seconds to leave time for
+ * the function to return a response.
  */
 
 import puppeteer, { Browser, Page } from "puppeteer-core";
@@ -43,32 +47,74 @@ export interface BrowserDiagnostics {
   error?: string;
 }
 
-// ── Browser Launch ─────────────────────────────────────────────────
+export interface ManagedBrowser {
+  browser: Browser;
+  isRemote: boolean; // true = connected via WebSocket, false = launched locally
+}
+
+// ── Constants ──────────────────────────────────────────────────────
+
+// Safe timeout for Vercel Hobby (10s limit) — leave 2s for function overhead
+const VERCEL_HOBBY_TIMEOUT = 8000;
+// Default timeout for any single browser operation
+const DEFAULT_ACTION_TIMEOUT = 5000;
+
+// ── Browser Instance Manager ───────────────────────────────────────
 
 /**
- * Launch or connect to a browser.
- *
- * Strategy (in order of priority):
- * 1. BROWSER_WS_ENDPOINT → generic WebSocket URL (works with any remote Chrome)
- * 2. BROWSERLESS_TOKEN → auto-build Browserless WebSocket URL
- * 3. On Vercel without remote → try @sparticuz/chromium
- * 4. Local dev → try local Chrome/Chromium
+ * Get a browser instance with metadata about whether it's remote or local.
+ * Use this with cleanupBrowser() for proper resource management.
  */
-export async function launchBrowser(): Promise<Browser> {
+export async function getBrowserInstance(): Promise<ManagedBrowser> {
   const wsEndpoint = getBrowserWSEndpoint();
-
   if (wsEndpoint) {
-    return connectRemoteBrowser(wsEndpoint);
+    console.log(`[Browser] Connecting to remote browser...`);
+    const browser = await connectRemoteBrowser(wsEndpoint);
+    return { browser, isRemote: true };
   }
 
+  // No remote endpoint — fall back to local/Sparticuz
   const isVercel = !!process.env.VERCEL;
-  console.log(`[Browser] No remote endpoint, falling back (Vercel: ${isVercel})`);
-
   if (isVercel) {
-    return launchSparticuzBrowser();
+    const browser = await launchSparticuzBrowser();
+    return { browser, isRemote: false };
   }
 
-  return launchLocalBrowser();
+  const browser = await launchLocalBrowser();
+  return { browser, isRemote: false };
+}
+
+/**
+ * Clean up browser: disconnect if remote, close if local.
+ * Always safe to call — catches and ignores errors.
+ */
+export async function cleanupBrowser(managed: ManagedBrowser): Promise<void> {
+  try {
+    if (managed.isRemote) {
+      managed.browser.disconnect();
+      console.log(`[Browser] Disconnected from remote browser`);
+    } else {
+      await managed.browser.close();
+      console.log(`[Browser] Closed local browser`);
+    }
+  } catch {
+    // Ignore cleanup errors
+  }
+}
+
+/**
+ * Convenience wrapper — launches browser, runs a callback, cleans up.
+ * Ensures browser is always cleaned up even on errors.
+ */
+export async function withBrowser<T>(
+  callback: (browser: Browser) => Promise<T>
+): Promise<T> {
+  const managed = await getBrowserInstance();
+  try {
+    return await callback(managed.browser);
+  } finally {
+    await cleanupBrowser(managed);
+  }
 }
 
 // ── Remote Browser Connection ──────────────────────────────────────
@@ -89,7 +135,8 @@ function getBrowserWSEndpoint(): string | null {
   const browserlessToken = process.env.BROWSERLESS_TOKEN;
   if (browserlessToken) {
     const browserlessHost = process.env.BROWSERLESS_HOST || "chrome.browserless.io";
-    const url = `wss://${browserlessHost}?token=${browserlessToken}&--disable-web-security=true`;
+    // Browserless v2 WebSocket format
+    const url = `wss://${browserlessHost}/?token=${browserlessToken}`;
     console.log(`[Browser] Using Browserless (${browserlessHost})`);
     return url;
   }
@@ -103,12 +150,14 @@ function getBrowserWSEndpoint(): string | null {
  */
 async function connectRemoteBrowser(wsEndpoint: string): Promise<Browser> {
   try {
-    console.log(`[Browser] Connecting to remote browser: ${maskUrl(wsEndpoint)}`);
+    console.log(`[Browser] Connecting to: ${maskUrl(wsEndpoint)}`);
 
     const browser = await puppeteer.connect({
       browserWSEndpoint: wsEndpoint,
       ignoreHTTPSErrors: true,
       defaultViewport: { width: 1280, height: 720 },
+      // Timeout the connection attempt quickly
+      transportTimeout: 10000,
     });
 
     console.log(`[Browser] Connected to remote browser successfully`);
@@ -196,7 +245,6 @@ async function launchLocalBrowser(): Promise<Browser> {
   }
 
   if (!executablePath) {
-    // Try @sparticuz/chromium as local fallback
     try {
       const chromium = await import("@sparticuz/chromium");
       const chromMod = chromium.default ?? chromium;
@@ -241,17 +289,14 @@ export async function checkBrowserAvailability(): Promise<BrowserDiagnostics> {
   const isVercel = !!process.env.VERCEL;
   const wsEndpoint = getBrowserWSEndpoint();
 
-  // If we have a remote endpoint, try a quick connection test
   if (wsEndpoint) {
     try {
       const browser = await puppeteer.connect({
         browserWSEndpoint: wsEndpoint,
         ignoreHTTPSErrors: true,
       });
-      // Quick check: can we open a page?
       const page = await browser.newPage();
       await page.close();
-      // Disconnect (don't close — we connected, not launched)
       browser.disconnect();
 
       return {
@@ -273,7 +318,6 @@ export async function checkBrowserAvailability(): Promise<BrowserDiagnostics> {
     }
   }
 
-  // Check Sparticuz
   try {
     const chromium = await import("@sparticuz/chromium");
     const chromMod = chromium.default ?? chromium;
@@ -285,7 +329,7 @@ export async function checkBrowserAvailability(): Promise<BrowserDiagnostics> {
       isVercel,
       nodeVersion: process.version,
     };
-  } catch (error) {
+  } catch {
     return {
       available: false,
       mode: "unavailable",
@@ -296,40 +340,58 @@ export async function checkBrowserAvailability(): Promise<BrowserDiagnostics> {
   }
 }
 
+// ── Timeout Helper ─────────────────────────────────────────────────
+
+/**
+ * Race a promise against a timeout. Returns the result or throws.
+ * This prevents browser operations from hanging beyond Vercel's function limit.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 // ── Browse Page ────────────────────────────────────────────────────
 
 /**
- * Navigate to a URL, wait for it to load, take a screenshot
+ * Navigate to a URL, wait for it to load, take a screenshot.
+ * Optimized for Vercel serverless — uses short timeouts.
  */
 export async function browsePage(options: BrowseOptions): Promise<BrowseResult> {
   const {
     url,
     width = 1280,
     height = 720,
-    waitFor = 3000,
+    waitFor = 1000, // Reduced from 3000 for Vercel
     fullPage = false,
     selector,
   } = options;
 
-  const managed = await getBrowserInstance();
-
-  try {
-    const page = await managed.browser.newPage();
+  return withBrowser(async (browser) => {
+    const page = await browser.newPage();
 
     await page.setViewport({ width, height });
     await page.setUserAgent(
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     );
 
+    // Navigate with shorter timeout for Vercel
     await page.goto(url, {
-      waitUntil: "networkidle2",
-      timeout: 30000,
+      waitUntil: "domcontentloaded", // Faster than networkidle2
+      timeout: DEFAULT_ACTION_TIMEOUT,
     });
 
+    // Set a short default timeout for all subsequent operations
+    page.setDefaultTimeout(DEFAULT_ACTION_TIMEOUT);
+
     if (selector) {
-      await page.waitForSelector(selector, { timeout: 10000 });
+      await page.waitForSelector(selector, { timeout: DEFAULT_ACTION_TIMEOUT });
     } else if (waitFor > 0) {
-      await new Promise((resolve) => setTimeout(resolve, waitFor));
+      await new Promise((resolve) => setTimeout(resolve, Math.min(waitFor, 2000)));
     }
 
     const title = await page.title();
@@ -355,9 +417,7 @@ export async function browsePage(options: BrowseOptions): Promise<BrowseResult> 
       links,
       html,
     };
-  } finally {
-    await cleanupBrowser(managed);
-  }
+  });
 }
 
 /**
@@ -368,11 +428,10 @@ export async function browseMultiplePages(
   options: Omit<BrowseOptions, "url"> = {}
 ): Promise<BrowseResult[]> {
   const results: BrowseResult[] = [];
-  const managed = await getBrowserInstance();
 
-  try {
+  return withBrowser(async (browser) => {
     for (const url of urls) {
-      const page = await managed.browser.newPage();
+      const page = await browser.newPage();
       try {
         await page.setViewport({
           width: options.width ?? 1280,
@@ -381,10 +440,11 @@ export async function browseMultiplePages(
         await page.setUserAgent(
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         );
-        await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
+        page.setDefaultTimeout(DEFAULT_ACTION_TIMEOUT);
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: DEFAULT_ACTION_TIMEOUT });
 
         if (options.waitFor && options.waitFor > 0) {
-          await new Promise((resolve) => setTimeout(resolve, options.waitFor));
+          await new Promise((resolve) => setTimeout(resolve, Math.min(options.waitFor ?? 1000, 2000)));
         }
 
         const title = await page.title();
@@ -422,48 +482,10 @@ export async function browseMultiplePages(
         await page.close();
       }
     }
-  } finally {
-    await cleanupBrowser(managed);
-  }
-
-  return results;
+    return results;
+  });
 }
 
-// ── Browser Instance Manager (exported for test-executor) ─────────
+// ── Export timeout constants for use by test executor ──────────────
 
-export interface ManagedBrowser {
-  browser: Browser;
-  isRemote: boolean; // true = connected via WebSocket, false = launched locally
-}
-
-/**
- * Get a browser instance with metadata about whether it's remote or local.
- * Use this with cleanupBrowser() for proper resource management.
- */
-export async function getBrowserInstance(): Promise<ManagedBrowser> {
-  const wsEndpoint = getBrowserWSEndpoint();
-  if (wsEndpoint) {
-    const browser = await connectRemoteBrowser(wsEndpoint);
-    return { browser, isRemote: true };
-  }
-  const browser = await launchBrowser();
-  return { browser, isRemote: false };
-}
-
-/**
- * Clean up browser: disconnect if remote, close if local.
- * Always safe to call — catches and ignores errors.
- */
-export async function cleanupBrowser(managed: ManagedBrowser): Promise<void> {
-  try {
-    if (managed.isRemote) {
-      managed.browser.disconnect();
-      console.log(`[Browser] Disconnected from remote browser`);
-    } else {
-      await managed.browser.close();
-      console.log(`[Browser] Closed local browser`);
-    }
-  } catch {
-    // Ignore cleanup errors
-  }
-}
+export { DEFAULT_ACTION_TIMEOUT, VERCEL_HOBBY_TIMEOUT };
