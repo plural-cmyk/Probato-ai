@@ -30,6 +30,8 @@ import {
   ChevronRight,
   MousePointerClick,
   Timer,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -196,6 +198,11 @@ export default function DashboardPage() {
   const [testUrl, setTestUrl] = useState("https://probato-ai.vercel.app");
   const [testPreset, setTestPreset] = useState("smoke");
   const [testRunning, setTestRunning] = useState(false);
+  const [browserStatus, setBrowserStatus] = useState<{
+    available: boolean;
+    mode: string;
+    error?: string;
+  } | null>(null);
   const [testResult, setTestResult] = useState<{
     testRunId?: string;
     result: {
@@ -247,6 +254,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (status === "authenticated") {
       fetchProjects();
+      // Check browser availability
+      fetch("/api/browser/check")
+        .then((res) => res.json())
+        .then((data) => setBrowserStatus(data))
+        .catch(() => setBrowserStatus({ available: false, mode: "unavailable", error: "Failed to check" }));
     }
   }, [status, fetchProjects]);
 
@@ -528,6 +540,32 @@ export default function DashboardPage() {
             Connect a repository to start generating automated tests.
           </p>
         </div>
+
+        {/* Browser Status Banner */}
+        {browserStatus && !browserStatus.available && (
+          <div className="mb-6 rounded-lg border border-warm-red/30 bg-warm-red/5 p-4 flex items-start gap-3">
+            <WifiOff className="h-5 w-5 text-warm-red shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-warm-red">Browser service not connected</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {browserStatus.error || "No remote browser endpoint configured."}{" "}
+                Add <code className="bg-zinc-100 px-1 py-0.5 rounded text-xs">BROWSERLESS_TOKEN</code> to your Vercel environment variables to enable browser testing.{" "}
+                <a href="https://www.browserless.io/" target="_blank" rel="noopener noreferrer" className="text-electric-violet underline">
+                  Get a free token at browserless.io
+                </a>
+              </p>
+            </div>
+          </div>
+        )}
+        {browserStatus && browserStatus.available && (
+          <div className="mb-6 rounded-lg border border-emerald/30 bg-emerald/5 p-3 flex items-center gap-3">
+            <Wifi className="h-4 w-4 text-emerald shrink-0" />
+            <p className="text-sm text-emerald">
+              Browser service connected
+              <span className="text-xs text-muted-foreground ml-2">({browserStatus.mode})</span>
+            </p>
+          </div>
+        )}
 
         {/* Quick Stats */}
         <div className="mb-8 grid gap-4 sm:grid-cols-3">

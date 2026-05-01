@@ -16,7 +16,7 @@
  */
 
 import { Browser, Page, ElementHandle } from "puppeteer-core";
-import { launchBrowser } from "@/lib/browser/chromium";
+import { getBrowserInstance, cleanupBrowser, ManagedBrowser } from "@/lib/browser/chromium";
 import {
   TestAction,
   TestRunConfig,
@@ -56,11 +56,11 @@ export async function executeTestRun(config: TestRunConfig): Promise<TestRunResu
   const maxSteps = config.maxSteps ?? 50;
   const screenshotEveryStep = config.screenshotEveryStep ?? true;
 
-  let browser: Browser | null = null;
+  let managed: ManagedBrowser | null = null;
 
   try {
-    browser = await launchBrowser();
-    const page = await browser.newPage();
+    managed = await getBrowserInstance();
+    const page = await managed.browser.newPage();
 
     // Set viewport
     await page.setViewport({
@@ -148,8 +148,8 @@ export async function executeTestRun(config: TestRunConfig): Promise<TestRunResu
       screenshots: [],
     };
   } finally {
-    if (browser) {
-      await browser.close();
+    if (managed) {
+      await cleanupBrowser(managed);
     }
   }
 
