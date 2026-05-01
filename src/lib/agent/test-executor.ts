@@ -143,9 +143,18 @@ export async function executeTestRun(config: TestRunConfig): Promise<TestRunResu
     }
   } catch (browserError) {
     // Browser launch or page creation failed
+    const errorMessage = browserError instanceof Error ? browserError.message : String(browserError);
+    console.error(`[Test Executor] Browser error: ${errorMessage}`);
+
     return {
       status: "error",
-      steps: [],
+      steps: config.actions.map((action) => ({
+        action,
+        status: "skipped" as StepStatus,
+        duration: 0,
+        timestamp: new Date().toISOString(),
+      })),
+      error: errorMessage,
       startedAt: new Date(startTime).toISOString(),
       endedAt: new Date().toISOString(),
       duration: Date.now() - startTime,

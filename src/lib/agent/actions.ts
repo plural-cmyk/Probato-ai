@@ -192,6 +192,7 @@ export interface StepResult {
 export interface TestRunResult {
   status: StepStatus;
   steps: StepResult[];
+  error?: string; // Top-level error (e.g. browser launch failure)
   startedAt: string;
   endedAt: string;
   duration: number; // total ms

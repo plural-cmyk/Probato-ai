@@ -32,6 +32,10 @@ import {
   Timer,
   Wifi,
   WifiOff,
+  Search,
+  Sparkles,
+  FileSearch,
+  ListChecks,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -207,6 +211,7 @@ export default function DashboardPage() {
     testRunId?: string;
     result: {
       status: string;
+      error?: string;
       steps: {
         action: { type: string; label: string };
         status: string;
@@ -230,6 +235,40 @@ export default function DashboardPage() {
     };
   } | null>(null);
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
+
+  // Feature Discovery state
+  const [discoverUrl, setDiscoverUrl] = useState("https://probato-ai.vercel.app");
+  const [discoverProjectId, setDiscoverProjectId] = useState("");
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverResult, setDiscoverResult] = useState<{
+    success: boolean;
+    page: {
+      url: string;
+      title: string;
+      forms: { selector: string; inputs: { selector: string; type?: string; placeholder?: string; label?: string }[]; submitButton?: { text?: string } }[];
+      links: { text?: string; href?: string }[];
+      buttons: { text?: string; selector: string }[];
+      navigation: { text?: string; href?: string }[];
+      headings: { level: number; text: string }[];
+    };
+    features: {
+      name: string;
+      type: string;
+      description: string;
+      selector?: string;
+      priority: number;
+      suggestedActions: { type: string; label: string }[];
+    }[];
+    persistedCount: number;
+    duration: number;
+    error?: string;
+  } | null>(null);
+  const [featureTestRunning, setFeatureTestRunning] = useState<string | null>(null);
+  const [featureTestResult, setFeatureTestResult] = useState<{
+    featureName: string;
+    status: string;
+    duration: number;
+  } | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -419,20 +458,118 @@ export default function DashboardPage() {
           screenshotEveryStep: true,
         }),
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setTestResult(data);
       } else {
-        const data = await res.json();
         // Show the actual error details from the server
         const errorMsg = data.details || data.error || "Failed to run test";
-        alert(errorMsg);
+        // Set the result with the error so it renders in the UI
+        setTestResult({
+          result: {
+            status: "error",
+            error: errorMsg,
+            steps: [],
+            startedAt: new Date().toISOString(),
+            endedAt: new Date().toISOString(),
+            duration: 0,
+            summary: { total: 0, passed: 0, failed: 0, skipped: 0, errors: 1 },
+          },
+        });
       }
     } catch (error) {
       console.error("Failed to run test:", error);
-      alert("Request failed — the function may have timed out. On Vercel Hobby plan, tests have a 10-second limit.");
+      setTestResult({
+        result: {
+          status: "error",
+          error: "Request failed — the function may have timed out. On Vercel Hobby plan, tests have a 10-second limit.",
+          steps: [],
+          startedAt: new Date().toISOString(),
+          endedAt: new Date().toISOString(),
+          duration: 0,
+          summary: { total: 0, passed: 0, failed: 0, skipped: 0, errors: 1 },
+        },
+      });
     } finally {
       setTestRunning(false);
+    }
+  }
+
+  async function discoverPageFeatures() {
+    if (!discoverUrl.trim()) return;
+    setDiscovering(true);
+    setDiscoverResult(null);
+    setFeatureTestResult(null);
+    try {
+      const body: Record<string, string | boolean> = {
+        url: discoverUrl,
+        includeLLM: true,
+      };
+      if (discoverProjectId.trim()) {
+        body.projectId = discoverProjectId.trim();
+        body.clearExisting = true;
+      }
+      const res = await fetch("/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDiscoverResult(data);
+      } else {
+        setDiscoverResult({
+          success: false,
+          page: { url: discoverUrl, title: "", forms: [], links: [], buttons: [], navigation: [], headings: [] },
+          features: [],
+          persistedCount: 0,
+          duration: 0,
+          error: data.details || data.error || "Discovery failed",
+        });
+      }
+    } catch (error) {
+      console.error("Feature discovery failed:", error);
+      setDiscoverResult({
+        success: false,
+        page: { url: discoverUrl, title: "", forms: [], links: [], buttons: [], navigation: [], headings: [] },
+        features: [],
+        persistedCount: 0,
+        duration: 0,
+        error: "Request failed — the function may have timed out.",
+      });
+    } finally {
+      setDiscovering(false);
+    }
+  }
+
+  async function runFeatureTest(featureId: string, featureName: string) {
+    setFeatureTestRunning(featureId);
+    setFeatureTestResult(null);
+    try {
+      const res = await fetch(`/api/discover/${featureId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: discoverUrl }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setFeatureTestResult({
+          featureName,
+          status: data.result?.status ?? "error",
+          duration: data.result?.duration ?? 0,
+        });
+      } else {
+        setFeatureTestResult({
+          featureName,
+          status: "error",
+          duration: 0,
+        });
+      }
+    } catch (error) {
+      console.error("Feature test failed:", error);
+      setFeatureTestResult({ featureName, status: "error", duration: 0 });
+    } finally {
+      setFeatureTestRunning(null);
     }
   }
 
@@ -748,6 +885,18 @@ export default function DashboardPage() {
               {/* Test Results */}
               {testResult && (
                 <div className="space-y-4 pt-2">
+                  {/* Top-level error (e.g. browser launch failure) */}
+                  {testResult.result.error && (
+                    <div className="rounded-lg border border-warm-red/30 bg-warm-red/5 p-4">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-warm-red shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-warm-red">Test execution failed</p>
+                          <p className="text-xs text-muted-foreground mt-1 font-mono">{testResult.result.error}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {/* Summary Bar */}
                   <div className="flex items-center gap-3 flex-wrap">
                     <Badge
@@ -898,6 +1047,247 @@ export default function DashboardPage() {
                       ))}
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Feature Discovery Section */}
+        <Card className="mb-8 border-border/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber/10">
+                <Sparkles className="h-4 w-4 text-amber" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Feature Discovery</CardTitle>
+                <CardDescription className="text-xs">
+                  Automatically discover testable features from any live URL
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Input row */}
+              <div className="flex gap-2 flex-col sm:flex-row">
+                <Input
+                  placeholder="https://your-app.com"
+                  value={discoverUrl}
+                  onChange={(e) => setDiscoverUrl(e.target.value)}
+                  className="font-mono text-sm sm:flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && discoverPageFeatures()}
+                />
+                <Input
+                  placeholder="Project ID (optional, to save features)"
+                  value={discoverProjectId}
+                  onChange={(e) => setDiscoverProjectId(e.target.value)}
+                  className="text-sm sm:w-[260px]"
+                />
+                <Button
+                  className="bg-amber hover:bg-amber/90 text-white shrink-0"
+                  onClick={discoverPageFeatures}
+                  disabled={discovering || !discoverUrl.trim()}
+                >
+                  {discovering ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="mr-1.5 h-4 w-4" />
+                  )}
+                  {discovering ? "Discovering..." : "Discover"}
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Visits the URL with a headless browser, extracts forms, buttons, links, navigation, and analyzes with LLM
+                to discover testable features. Optionally saves them to a project for persistent tracking.
+              </p>
+
+              {/* Error */}
+              {discoverResult?.error && (
+                <div className="rounded-lg border border-warm-red/30 bg-warm-red/5 p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-warm-red shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-warm-red">Discovery failed</p>
+                      <p className="text-xs text-muted-foreground mt-1 font-mono">{discoverResult.error}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Discovery Results */}
+              {discoverResult && discoverResult.success && (
+                <div className="space-y-4 pt-2">
+                  {/* Page Summary */}
+                  <div className="rounded-lg border p-4 bg-white">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileSearch className="h-4 w-4 text-deep-indigo" />
+                      <h4 className="text-sm font-semibold text-deep-indigo">Page Analysis</h4>
+                      <Badge variant="secondary" className="text-xs ml-auto">
+                        {(discoverResult.duration / 1000).toFixed(1)}s
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                      <div className="rounded-md bg-zinc-50 p-2">
+                        <div className="text-lg font-bold text-deep-indigo">{discoverResult.page.forms.length}</div>
+                        <div className="text-xs text-muted-foreground">Forms</div>
+                      </div>
+                      <div className="rounded-md bg-zinc-50 p-2">
+                        <div className="text-lg font-bold text-deep-indigo">{discoverResult.page.links.length}</div>
+                        <div className="text-xs text-muted-foreground">Links</div>
+                      </div>
+                      <div className="rounded-md bg-zinc-50 p-2">
+                        <div className="text-lg font-bold text-deep-indigo">{discoverResult.page.buttons.length}</div>
+                        <div className="text-xs text-muted-foreground">Buttons</div>
+                      </div>
+                      <div className="rounded-md bg-zinc-50 p-2">
+                        <div className="text-lg font-bold text-deep-indigo">{discoverResult.page.navigation.length}</div>
+                        <div className="text-xs text-muted-foreground">Nav Items</div>
+                      </div>
+                      <div className="rounded-md bg-zinc-50 p-2">
+                        <div className="text-lg font-bold text-amber">{discoverResult.features.length}</div>
+                        <div className="text-xs text-muted-foreground">Features</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      <strong>Title:</strong> {discoverResult.page.title || "No title"}
+                      {discoverResult.persistedCount > 0 && (
+                        <span className="ml-3 text-emerald">
+                          <CheckCircle2 className="inline h-3 w-3 mr-0.5" />
+                          {discoverResult.persistedCount} features saved to project
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Discovered Features */}
+                  {discoverResult.features.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-deep-indigo flex items-center gap-1.5 mb-3">
+                        <ListChecks className="h-4 w-4" />
+                        Discovered Features ({discoverResult.features.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {discoverResult.features.map((feature, i) => (
+                          <div key={i} className="rounded-lg border bg-white">
+                            <div className="flex items-center gap-2 px-3 py-2.5">
+                              {/* Priority badge */}
+                              <Badge
+                                variant="outline"
+                                className={`shrink-0 text-xs ${
+                                  feature.priority === 1
+                                    ? "bg-warm-red/10 text-warm-red border-warm-red/20"
+                                    : feature.priority === 2
+                                    ? "bg-amber/10 text-amber border-amber/20"
+                                    : "bg-emerald/10 text-emerald border-emerald/20"
+                                }`}
+                              >
+                                P{feature.priority}
+                              </Badge>
+
+                              {/* Type badge */}
+                              <Badge variant="secondary" className="shrink-0 text-xs capitalize">
+                                {feature.type}
+                              </Badge>
+
+                              {/* Feature name */}
+                              <span className="text-sm font-medium truncate flex-1">
+                                {feature.name}
+                              </span>
+
+                              {/* Selector */}
+                              {feature.selector && (
+                                <code className="text-xs bg-zinc-100 px-1.5 py-0.5 rounded hidden sm:inline truncate max-w-[200px]">
+                                  {feature.selector}
+                                </code>
+                              )}
+
+                              {/* Test actions count */}
+                              {feature.suggestedActions.length > 0 && (
+                                <Badge variant="outline" className="text-xs shrink-0">
+                                  {feature.suggestedActions.length} steps
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Description */}
+                            <div className="border-t px-3 py-2">
+                              <p className="text-xs text-muted-foreground">{feature.description}</p>
+
+                              {/* Suggested actions preview */}
+                              {feature.suggestedActions.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {feature.suggestedActions.slice(0, 5).map((action, j) => (
+                                    <span
+                                      key={j}
+                                      className="text-xs bg-electric-violet/5 text-electric-violet border border-electric-violet/20 rounded px-1.5 py-0.5"
+                                    >
+                                      {j + 1}. {action.label || action.type}
+                                    </span>
+                                  ))}
+                                  {feature.suggestedActions.length > 5 && (
+                                    <span className="text-xs text-muted-foreground">
+                                      +{feature.suggestedActions.length - 5} more
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Run test button (only if feature has a persisted ID) */}
+                            {/* The feature test requires a projectId to persist the feature first */}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Page structure details */}
+                  <details className="group">
+                    <summary className="cursor-pointer text-xs text-muted-foreground hover:text-deep-indigo flex items-center gap-1">
+                      <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform" />
+                      View raw page structure
+                    </summary>
+                    <div className="mt-2 rounded-lg border bg-zinc-50 p-3 text-xs font-mono space-y-2 max-h-60 overflow-y-auto">
+                      {discoverResult.page.headings.length > 0 && (
+                        <div>
+                          <strong>Headings:</strong>
+                          {discoverResult.page.headings.map((h, i) => (
+                            <div key={i} className="ml-2">H{h.level}: {h.text}</div>
+                          ))}
+                        </div>
+                      )}
+                      {discoverResult.page.forms.length > 0 && (
+                        <div>
+                          <strong>Forms:</strong>
+                          {discoverResult.page.forms.map((form, i) => (
+                            <div key={i} className="ml-2">
+                              Form {i + 1} ({form.selector}): {form.inputs.length} input(s)
+                              {form.submitButton && `, submit: "${form.submitButton.text}"`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {discoverResult.page.buttons.length > 0 && (
+                        <div>
+                          <strong>Buttons:</strong>
+                          {discoverResult.page.buttons.slice(0, 10).map((btn, i) => (
+                            <div key={i} className="ml-2">{btn.text ?? btn.selector}</div>
+                          ))}
+                        </div>
+                      )}
+                      {discoverResult.page.navigation.length > 0 && (
+                        <div>
+                          <strong>Navigation:</strong>
+                          {discoverResult.page.navigation.slice(0, 10).map((nav, i) => (
+                            <div key={i} className="ml-2">{nav.text} → {nav.href}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </details>
                 </div>
               )}
             </div>
