@@ -1878,6 +1878,15 @@ export default function DashboardPage() {
                       >
                         <RefreshCw className="h-3.5 w-3.5" />
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-deep-indigo"
+                        onClick={() => router.push(`/dashboard/projects/${project.id}`)}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                        Details
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

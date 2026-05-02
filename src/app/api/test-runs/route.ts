@@ -15,24 +15,24 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId");
 
-    if (!projectId) {
-      return NextResponse.json(
-        { error: "projectId query parameter required" },
-        { status: 400 }
-      );
-    }
+    // projectId is optional — if not provided, return all runs for the user
+    const whereClause = projectId
+      ? { projectId }
+      : { project: { userId: session.user.id } };
 
-    // Verify project belongs to user
-    const project = await db.project.findFirst({
-      where: { id: projectId, userId: session.user.id },
-    });
+    if (projectId) {
+      // Verify project belongs to user
+      const project = await db.project.findFirst({
+        where: { id: projectId, userId: session.user.id },
+      });
 
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
     }
 
     const testRuns = await db.testRun.findMany({
-      where: { projectId },
+      where: whereClause,
       include: {
         results: {
           select: {
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       take: 20,
     });
 
-    return NextResponse.json({ testRuns });
+    return NextResponse.json({ runs: testRuns, testRuns });
   } catch (error) {
     console.error("Failed to fetch test runs:", error);
     return NextResponse.json(
