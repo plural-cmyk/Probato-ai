@@ -269,6 +269,25 @@ export default function DashboardPage() {
     status: string;
     duration: number;
   } | null>(null);
+  const [generatingTests, setGeneratingTests] = useState(false);
+  const [generatedResult, setGeneratedResult] = useState<{
+    featureCount: number;
+    savedCount: number;
+    code?: string;
+  } | null>(null);
+  const [autoHealing, setAutoHealing] = useState(false);
+  const [autoHealResult, setAutoHealResult] = useState<{
+    healed: boolean;
+    totalHealed: number;
+    totalFailed: number;
+    duration: number;
+  } | null>(null);
+  const [testOrder, setTestOrder] = useState<{
+    levels: { id: string; name: string; type: string; priority: number }[][];
+    totalFeatures: number;
+    maxDepth: number;
+    cycleCount: number;
+  } | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -570,6 +589,88 @@ export default function DashboardPage() {
       setFeatureTestResult({ featureName, status: "error", duration: 0 });
     } finally {
       setFeatureTestRunning(null);
+    }
+  }
+
+  async function generateTests() {
+    if (!discoverProjectId.trim()) return;
+    setGeneratingTests(true);
+    setGeneratedResult(null);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: discoverProjectId.trim(),
+          url: discoverUrl,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setGeneratedResult({
+          featureCount: data.featureCount,
+          savedCount: data.savedCount,
+          code: data.suite?.testCases?.[0]?.code,
+        });
+      } else {
+        setGeneratedResult({ featureCount: 0, savedCount: 0 });
+      }
+    } catch {
+      setGeneratedResult({ featureCount: 0, savedCount: 0 });
+    } finally {
+      setGeneratingTests(false);
+    }
+  }
+
+  async function runAutoHeal() {
+    setAutoHealing(true);
+    setAutoHealResult(null);
+    try {
+      // Get the latest failed test run
+      const res = await fetch("/api/test-runs", {
+        method: "GET",
+      });
+      const data = await res.json();
+      const failedRun = data.runs?.find((r: { status: string }) => r.status === "failed" || r.status === "error");
+      if (!failedRun) {
+        setAutoHealResult({ healed: false, totalHealed: 0, totalFailed: 0, duration: 0 });
+        setAutoHealing(false);
+        return;
+      }
+
+      const healRes = await fetch("/api/auto-heal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ testRunId: failedRun.id, url: discoverUrl }),
+      });
+      const healData = await healRes.json();
+      if (healRes.ok) {
+        setAutoHealResult({
+          healed: healData.healed,
+          totalHealed: healData.report?.totalHealed ?? 0,
+          totalFailed: healData.report?.totalFailed ?? 0,
+          duration: healData.report?.duration ?? 0,
+        });
+      } else {
+        setAutoHealResult({ healed: false, totalHealed: 0, totalFailed: 0, duration: 0 });
+      }
+    } catch {
+      setAutoHealResult({ healed: false, totalHealed: 0, totalFailed: 0, duration: 0 });
+    } finally {
+      setAutoHealing(false);
+    }
+  }
+
+  async function loadTestOrder() {
+    if (!discoverProjectId.trim()) return;
+    try {
+      const res = await fetch(`/api/test-order?projectId=${discoverProjectId.trim()}&impact=true`);
+      if (res.ok) {
+        const data = await res.json();
+        setTestOrder(data.executionOrder ?? null);
+      }
+    } catch {
+      // Ignore
     }
   }
 
@@ -1236,8 +1337,48 @@ export default function DashboardPage() {
                               )}
                             </div>
 
-                            {/* Run test button (only if feature has a persisted ID) */}
-                            {/* The feature test requires a projectId to persist the feature first */}
+                            {/* Action buttons for discovered features */}
+                            {discoverProjectId.trim() && (
+                              <div className="border-t px-3 py-2 flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7"
+                                  onClick={generateTests}
+                                  disabled={generatingTests}
+                                >
+                                  {generatingTests ? (
+                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="mr-1 h-3 w-3" />
+                                  )}
+                                  Generate Tests
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7"
+                                  onClick={runAutoHeal}
+                                  disabled={autoHealing}
+                                >
+                                  {autoHealing ? (
+                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="mr-1 h-3 w-3" />
+                                  )}
+                                  Auto-Heal
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7"
+                                  onClick={loadTestOrder}
+                                >
+                                  <ListChecks className="mr-1 h-3 w-3" />
+                                  Test Order
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1288,6 +1429,92 @@ export default function DashboardPage() {
                       )}
                     </div>
                   </details>
+
+                  {/* Generated Tests Result */}
+                  {generatedResult && (
+                    <div className="rounded-lg border p-4 bg-white">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="h-4 w-4 text-amber" />
+                        <h4 className="text-sm font-semibold text-deep-indigo">Generated Playwright Tests</h4>
+                      </div>
+                      <div className="flex gap-3 mb-2">
+                        <Badge variant="secondary" className="text-xs">{generatedResult.featureCount} features</Badge>
+                        <Badge variant="secondary" className="text-xs text-emerald">{generatedResult.savedCount} saved to DB</Badge>
+                      </div>
+                      {generatedResult.code && (
+                        <details className="group">
+                          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-deep-indigo flex items-center gap-1">
+                            <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform" />
+                            View generated test code
+                          </summary>
+                          <pre className="mt-2 rounded-lg bg-zinc-950 text-zinc-100 p-3 text-xs font-mono overflow-x-auto max-h-60">
+                            {generatedResult.code.substring(0, 2000)}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Auto-Heal Result */}
+                  {autoHealResult && (
+                    <div className={`rounded-lg border p-4 ${autoHealResult.healed ? "bg-emerald/5 border-emerald/30" : "bg-warm-red/5 border-warm-red/30"}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <RefreshCw className={`h-4 w-4 ${autoHealResult.healed ? "text-emerald" : "text-warm-red"}`} />
+                        <h4 className="text-sm font-semibold text-deep-indigo">Auto-Heal Result</h4>
+                      </div>
+                      <div className="flex gap-3">
+                        <Badge variant="secondary" className={`text-xs ${autoHealResult.healed ? "text-emerald" : "text-warm-red"}`}>
+                          {autoHealResult.healed ? "Healed" : "Could not heal"}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">{autoHealResult.totalHealed} selector(s) healed</Badge>
+                        <Badge variant="secondary" className="text-xs text-muted-foreground">{(autoHealResult.duration / 1000).toFixed(1)}s</Badge>
+                      </div>
+                      {autoHealResult.totalFailed > 0 && (
+                        <p className="text-xs text-warm-red mt-2">{autoHealResult.totalFailed} selector(s) could not be healed automatically</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Test Execution Order */}
+                  {testOrder && (
+                    <div className="rounded-lg border p-4 bg-white">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ListChecks className="h-4 w-4 text-deep-indigo" />
+                        <h4 className="text-sm font-semibold text-deep-indigo">Test Execution Order</h4>
+                        <Badge variant="secondary" className="text-xs ml-auto">{testOrder.totalFeatures} features, depth {testOrder.maxDepth}</Badge>
+                      </div>
+                      {testOrder.cycleCount > 0 && (
+                        <p className="text-xs text-amber mb-2">⚠ {testOrder.cycleCount} circular dependency(ies) detected</p>
+                      )}
+                      <div className="space-y-2">
+                        {testOrder.levels.map((level, levelIdx) => (
+                          <div key={levelIdx} className="flex items-start gap-2">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-deep-indigo/10 text-xs font-bold text-deep-indigo shrink-0 mt-0.5">
+                              {levelIdx + 1}
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {level.map((feature) => (
+                                <Badge
+                                  key={feature.id}
+                                  variant="outline"
+                                  className={`text-xs ${
+                                    feature.priority === 1
+                                      ? "bg-warm-red/10 text-warm-red border-warm-red/20"
+                                      : feature.priority === 2
+                                      ? "bg-amber/10 text-amber border-amber/20"
+                                      : "bg-emerald/10 text-emerald border-emerald/20"
+                                  }`}
+                                >
+                                  {feature.name}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">Features at the same level can run in parallel</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
