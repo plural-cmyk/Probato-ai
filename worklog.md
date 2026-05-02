@@ -89,3 +89,98 @@ Stage Summary:
 - 5 preset test types available from dashboard
 - Works on Vercel using @sparticuz/chromium (same as Milestone 3)
 - Awaiting user testing on Vercel deployment
+
+---
+Task ID: 7
+Agent: main
+Task: Phase 1 Milestone 7 - Smart Test Generation & Auto-Heal
+
+Work Log:
+- Created Playwright Test Code Generator (src/lib/agent/test-generator.ts):
+  - Converts TestAction[] to executable Playwright test files
+  - Supports all 18 action types with proper Playwright syntax (locator, expect, etc.)
+  - Generates test.describe blocks with proper structure
+  - Produces combined test suites from multiple features
+  - Shared selector constants for maintainability
+  - Selector conversion: testId→data-testid, text→text(), role→role(), etc.
+- Created Auto-Heal Engine (src/lib/agent/auto-heal.ts):
+  - Detects selector-based failures in test results
+  - 6 healing strategies: text search, CSS patterns, text→testId, nearby testIds, ARIA roles, label/placeholder
+  - Confidence scoring (0-1) with text similarity matching
+  - Retests with healed selector before confirming
+  - Updates TestCase records in DB with autoHealed=true flag
+  - Full candidate discovery via browser DOM evaluation
+- Created Dependency Graph & Topological Sort (src/lib/agent/dependency-graph.ts):
+  - Builds dependency graph from Feature records in DB
+  - Resolves name-based dependencies to IDs (for LLM output)
+  - Kahn's algorithm for topological sort with level-based parallel groups
+  - Cycle detection via DFS with cycle extraction
+  - Impact analysis: direct + transitive dependents, risk levels (low/medium/high)
+- Created API routes:
+  - POST /api/generate - Generate Playwright tests (single feature or full project)
+  - POST /api/auto-heal - Auto-heal failed test runs by finding alternative selectors
+  - GET /api/test-order - Get topological test execution order with impact analysis
+- Updated Dashboard:
+  - Generate Tests button with code viewer
+  - Auto-Heal button with result panel (healed count, duration)
+  - Test Order button with level-based execution order visualization
+- Build verified - all 17 routes compile cleanly
+- Pushed to GitHub (commit db73dd5)
+
+Stage Summary:
+- ✅ Milestone 7 code complete and pushed
+- Playwright test code generation from discovered features
+- Auto-heal engine that finds alternative selectors when tests break
+- Dependency graph with topological sort and impact analysis
+- Tests maintain themselves through auto-healing
+
+---
+Task ID: 8
+Agent: main
+Task: Phase 1 Milestone 8 - Reporting & Project Management
+
+Work Log:
+- Created Project Detail Page (src/app/dashboard/projects/[id]/page.tsx):
+  - Full project view with features, test cases, test run history
+  - Stats cards: features, test cases, pass rate, total runs, auto-healed count
+  - Feature list with expand/collapse, priority badges, test case code viewer
+  - Test run history with per-result status, duration, error details
+  - Discover Features and Generate Tests buttons
+  - Back navigation to main dashboard
+- Created Reports API (src/app/api/reports/route.ts):
+  - GET endpoint with project summary statistics
+  - Features by type and priority breakdown
+  - Test run trend data (last 10 runs with pass/fail/duration)
+  - Per-feature test results aggregation
+  - CSV export format (download as .csv file)
+  - JSON format with full statistics
+- Updated main Dashboard:
+  - 'Details' button on project cards linking to project detail page
+- Updated Test Runs API:
+  - projectId is now optional (returns all user runs if omitted)
+  - Returns both 'runs' and 'testRuns' keys for compatibility
+- Build verified - all 18 routes + 1 dynamic page compile cleanly
+- Pushed to GitHub (commit d100f99)
+
+Stage Summary:
+- ✅ Milestone 8 code complete and pushed
+- Project detail page with full feature and test management
+- Reports API with JSON and CSV export
+- Phase 1 COMPLETE — all 8 milestones delivered
+
+═══════════════════════════════════════════════════════
+PHASE 1 COMPLETE — All Milestones Delivered
+═══════════════════════════════════════════════════════
+M1: GitHub OAuth + Dashboard ✅
+M2: Docker Sandbox API ✅
+M3: Browser Automation ✅
+M4: LLM Code Analysis ✅
+M5: Test Executor Agent ✅
+M6: Feature Discovery Agent ✅
+M7: Smart Test Generation & Auto-Heal ✅
+M8: Reporting & Project Management ✅
+
+Total API Routes: 18
+Total Pages: 5 (/, /auth/signin, /dashboard, /dashboard/projects/[id], /_not-found)
+Key Agent Files: actions.ts, test-executor.ts, feature-discovery.ts, test-generator.ts, auto-heal.ts, dependency-graph.ts
+Key Browser: chromium.ts (4-tier: Browserless → WS Endpoint → Sparticuz → Local)
