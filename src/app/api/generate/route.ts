@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { generatePlaywrightTest, generateTestSuite, generateCombinedTestFile } from "@/lib/agent/test-generator";
+import { sel, actions } from "@/lib/agent/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -189,38 +190,35 @@ function buildActionsFromFeatureData(
   feature: { name: string; type: string; selector?: string | null; route?: string | null },
   url: string
 ) {
-  // Dynamic import to avoid circular dependency
-  const { sel: s, actions: a } = require("@/lib/agent/actions");
-
   switch (feature.type) {
     case "form":
       return [
-        a.navigate(url, `Navigate to form`),
-        a.waitForSelector(s.css(feature.selector ?? "form"), 5000, "Wait for form"),
-        a.screenshot(false, "Form loaded"),
-        a.assertVisible(s.css(feature.selector ?? "form"), "Verify form is visible"),
+        actions.navigate(url, `Navigate to form`),
+        actions.waitForSelector(sel.css(feature.selector ?? "form"), 5000, "Wait for form"),
+        actions.screenshot(false, "Form loaded"),
+        actions.assertVisible(sel.css(feature.selector ?? "form"), "Verify form is visible"),
       ];
     case "navigation":
       return [
-        a.navigate(url, `Navigate to page`),
-        a.waitForSelector(s.css("nav, [role=navigation]"), 5000, "Wait for navigation"),
-        a.assertVisible(s.css("nav, [role=navigation]"), "Verify navigation is visible"),
-        a.screenshot(false, "Navigation check"),
+        actions.navigate(url, `Navigate to page`),
+        actions.waitForSelector(sel.css("nav, [role=navigation]"), 5000, "Wait for navigation"),
+        actions.assertVisible(sel.css("nav, [role=navigation]"), "Verify navigation is visible"),
+        actions.screenshot(false, "Navigation check"),
       ];
     case "page":
       return [
-        a.navigate(feature.route ?? url, `Navigate to ${feature.name}`),
-        a.waitForSelector(s.css("body"), 5000, "Wait for page"),
-        a.screenshot(false, "Page loaded"),
+        actions.navigate(feature.route ?? url, `Navigate to ${feature.name}`),
+        actions.waitForSelector(sel.css("body"), 5000, "Wait for page"),
+        actions.screenshot(false, "Page loaded"),
       ];
     default:
       return [
-        a.navigate(url, `Navigate to page`),
-        a.waitForSelector(s.css("body"), 5000, "Wait for page"),
+        actions.navigate(url, `Navigate to page`),
+        actions.waitForSelector(sel.css("body"), 5000, "Wait for page"),
         ...(feature.selector
-          ? [a.assertVisible(s.css(feature.selector), `Verify ${feature.name} is visible`)]
+          ? [actions.assertVisible(sel.css(feature.selector), `Verify ${feature.name} is visible`)]
           : []),
-        a.screenshot(false, "Basic check"),
+        actions.screenshot(false, "Basic check"),
       ];
   }
 }

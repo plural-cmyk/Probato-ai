@@ -248,7 +248,7 @@ function generateActionLines(action: TestAction, pageVar: string): string[] {
     case "press":
       return generatePress(action as PressAction, pageVar);
     case "wait":
-      return generateWait(action as WaitAction);
+      return generateWait(action as WaitAction, pageVar);
     case "waitForSelector":
       return generateWaitForSelector(action as WaitForSelectorAction, pageVar);
     case "waitForNavigation":
@@ -345,10 +345,10 @@ function generatePress(action: PressAction, pageVar: string): string[] {
   ];
 }
 
-function generateWait(action: WaitAction): string[] {
+function generateWait(action: WaitAction, pageVar: string): string[] {
   return [
     `// ${action.label || `Wait ${action.ms}ms`}`,
-    `await ${pageVar_name()}.waitForTimeout(${action.ms});`,
+    `await ${pageVar}.waitForTimeout(${action.ms});`,
   ];
 }
 
@@ -531,10 +531,6 @@ function buildTestFile(opts: {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
-
-function pageVar_name(): string {
-  return "page";
-}
 
 function sanitizeForFilename(name: string): string {
   return name
