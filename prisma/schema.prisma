@@ -77,6 +77,7 @@ model User {
   subscription           Subscription?
   creditBalance          CreditBalance?
   creditTransactions     CreditTransaction[]
+  apiKeys                ApiKey[]
 }
 
 model Project {
@@ -503,4 +504,57 @@ model CreditTransaction {
   @@index([action])
   @@index([createdAt])
   @@index([referenceType, referenceId])
+}
+
+// ============================================
+// Phase 2: Public API & Developer SDK
+// ============================================
+
+model ApiKey {
+  id                String   @id @default(cuid())
+  name              String   // Human-readable label, e.g. "CI/CD Pipeline", "Dev Machine"
+  prefix            String   // First 8 chars of the key for identification (e.g. "pb_live_")
+  keyHash           String   @unique // Scrypt hash of the full API key
+  scopes            Json     @default("{\"scopes\":[\"read\"]}") // ["read", "write", "admin", "billing"]
+  enabled           Boolean  @default(true)
+  lastUsedAt        DateTime?
+  expiresAt         DateTime? // Optional expiration date
+  rateLimitOverride Int?     // Custom rate limit (requests/min) overriding plan default
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  usage             ApiUsage[]
+
+  @@index([userId])
+  @@index([prefix])
+  @@index([keyHash])
+  @@index([enabled])
+}
+
+model ApiUsage {
+  id              String   @id @default(cuid())
+  apiKeyId        String
+  userId          String
+  endpoint        String   // e.g. "POST /api/v1/discover"
+  method          String   // GET, POST, PATCH, DELETE
+  statusCode      Int      // HTTP response status code
+  creditsUsed     Int      @default(0) // Credits consumed by this request
+  responseTime    Int?     // Response time in milliseconds
+  userAgent       String?  // Client User-Agent header
+  ipAddress       String?  // Client IP address
+  errorMessage    String?  // Error message if request failed
+
+  createdAt       DateTime @default(now())
+
+  apiKey          ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId])
+  @@index([userId])
+  @@index([endpoint])
+  @@index([createdAt])
+  @@index([statusCode])
 }
