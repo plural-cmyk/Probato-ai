@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getPlanList, CREDIT_PACKS, PlanSlug, PLANS } from "@/lib/billing/plans";
-import { ensureUserBilling, getCreditBalance, getBillingSummary } from "@/lib/billing/credits";
+import { ensureUserBilling, getCreditBalance } from "@/lib/billing/credits";
+import { getBillingSummary } from "@/lib/billing/subscription";
 
 export const dynamic = "force-dynamic";
 

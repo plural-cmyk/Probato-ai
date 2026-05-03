@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 
 export async function GET(
   request: NextRequest,
@@ -22,7 +22,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const diff = await prisma.visualDiff.findFirst({
+    const diff = await db.visualDiff.findFirst({
       where: {
         id,
         project: { userId: session.user.id },
@@ -85,7 +85,7 @@ export async function PATCH(
     }
 
     // Verify ownership
-    const diff = await prisma.visualDiff.findFirst({
+    const diff = await db.visualDiff.findFirst({
       where: {
         id,
         project: { userId: session.user.id },
@@ -97,7 +97,7 @@ export async function PATCH(
     }
 
     // Update diff status
-    const updated = await prisma.visualDiff.update({
+    const updated = await db.visualDiff.update({
       where: { id },
       data: {
         status,
@@ -109,7 +109,7 @@ export async function PATCH(
     // If approved, update the baseline screenshot with the current screenshot
     // (the new screenshot becomes the new baseline)
     if (status === "approved") {
-      await prisma.visualBaseline.update({
+      await db.visualBaseline.update({
         where: { id: diff.baselineId },
         data: {
           screenshot: diff.currentScreenshot,

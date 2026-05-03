@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
       where.status = status;
     }
 
-    const diffs = await prisma.visualDiff.findMany({
+    const diffs = await db.visualDiff.findMany({
       where,
       orderBy: { createdAt: "desc" },
       take: 50,

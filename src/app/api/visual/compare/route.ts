@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { compareScreenshots, captureForVisualRegression, createCompositeDiff } from "@/lib/visual/compare";
 import { dispatchNotification } from "@/lib/notifications/dispatcher";
 import { checkCredits, deductCredits } from "@/lib/billing/credits";
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch the baseline
-    const baseline = await prisma.visualBaseline.findFirst({
+    const baseline = await db.visualBaseline.findFirst({
       where: {
         id: baselineId,
         userId: session.user.id,
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
     // Create VisualDiff record in DB
     let diffRecord = null;
     if (createDiff) {
-      diffRecord = await prisma.visualDiff.create({
+      diffRecord = await db.visualDiff.create({
         data: {
           status: result.match ? "approved" : "pending",
           mismatchPercent: result.mismatchPercent,

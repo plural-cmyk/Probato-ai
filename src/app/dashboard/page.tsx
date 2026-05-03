@@ -54,6 +54,11 @@ import {
   Hash,
   Trash,
   CreditCard,
+  Key,
+  Copy,
+  Shield,
+  Activity,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -450,6 +455,29 @@ export default function DashboardPage() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [showBillingPanel, setShowBillingPanel] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<{
+    id: string;
+    name: string;
+    prefix: string;
+    scopes: string[];
+    enabled: boolean;
+    lastUsedAt: string | null;
+    expiresAt: string | null;
+    createdAt: string;
+    usageCount: number;
+  }[]>([]);
+  const [apiKeysLoading, setApiKeysLoading] = useState(false);
+  const [showApiKeysPanel, setShowApiKeysPanel] = useState(false);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyScopes, setNewKeyScopes] = useState<string[]>(["read"]);
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
+  const [apiUsageStats, setApiUsageStats] = useState<{
+    aggregated: { totalCredits: number; avgResponseTime: number; totalRequests: number };
+    statusBreakdown: { statusCode: number; count: number }[];
+  } | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -1150,6 +1178,102 @@ export default function DashboardPage() {
     }
   }
 
+  // ── API Keys functions ──────────────────────────────────────────
+
+  async function loadApiKeys() {
+    setApiKeysLoading(true);
+    try {
+      const res = await fetch("/api/api-keys");
+      if (res.ok) {
+        const data = await res.json();
+        setApiKeys(data.keys ?? []);
+      }
+    } catch (error) {
+      console.error("Failed to load API keys:", error);
+    } finally {
+      setApiKeysLoading(false);
+    }
+  }
+
+  async function createApiKey() {
+    if (!newKeyName.trim()) return;
+    setCreatingKey(true);
+    try {
+      const res = await fetch("/api/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newKeyName.trim(), scopes: newKeyScopes }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNewlyCreatedKey(data.key);
+        setNewKeyName("");
+        setNewKeyScopes(["read"]);
+        await loadApiKeys();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to create API key");
+      }
+    } catch (error) {
+      console.error("Failed to create API key:", error);
+    } finally {
+      setCreatingKey(false);
+    }
+  }
+
+  async function revokeApiKey(keyId: string) {
+    try {
+      await fetch(`/api/api-keys/${keyId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: false }),
+      });
+      await loadApiKeys();
+    } catch (error) {
+      console.error("Failed to revoke API key:", error);
+    }
+  }
+
+  async function deleteApiKey(keyId: string) {
+    if (!confirm("Permanently delete this API key? This cannot be undone.")) return;
+    try {
+      await fetch(`/api/api-keys/${keyId}`, { method: "DELETE" });
+      await loadApiKeys();
+    } catch (error) {
+      console.error("Failed to delete API key:", error);
+    }
+  }
+
+  async function rotateApiKey(keyId: string) {
+    if (!confirm("Rotate this API key? The old key will stop working immediately.")) return;
+    try {
+      const res = await fetch(`/api/api-keys/${keyId}/rotate`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setNewlyCreatedKey(data.key);
+        await loadApiKeys();
+      }
+    } catch (error) {
+      console.error("Failed to rotate API key:", error);
+    }
+  }
+
+  async function loadApiUsage() {
+    try {
+      const res = await fetch("/api/v1/usage?days=7");
+      if (res.ok) {
+        const data = await res.json();
+        setApiUsageStats(data.data ?? null);
+      }
+    } catch (error) {
+      console.error("Failed to load API usage:", error);
+    }
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text);
+  }
+
   // ── Notification functions ──────────────────────────────────────
 
   async function loadNotifications() {
@@ -1334,6 +1458,21 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* API Keys Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setShowApiKeysPanel(!showApiKeysPanel);
+                if (!showApiKeysPanel) {
+                  loadApiKeys();
+                  loadApiUsage();
+                }
+              }}
+            >
+              <Key className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
             {/* Billing Button */}
             <Button
               variant="ghost"
@@ -3546,6 +3685,186 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* API Keys Dialog */}
+      <Dialog open={showApiKeysPanel} onOpenChange={setShowApiKeysPanel}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5 text-deep-indigo" />
+              API Keys & Developer Access
+            </DialogTitle>
+            <DialogDescription>
+              Manage API keys for programmatic access to Probato. Use the SDK or REST API to integrate testing into your CI/CD pipeline.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            {/* Quick Start */}
+            <Card className="border-deep-indigo/20 bg-deep-indigo/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Quick Start</CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs space-y-2">
+                <p><strong>Base URL:</strong> <code className="bg-white px-1 rounded">{typeof window !== "undefined" ? window.location.origin : "https://probato.ai"}/api/v1</code></p>
+                <p><strong>Auth:</strong> <code className="bg-white px-1 rounded">Authorization: Bearer pb_live_xxx</code></p>
+                <p><strong>SDK:</strong> <code className="bg-white px-1 rounded">npm install @probato/sdk</code></p>
+                <div className="bg-zinc-900 text-green-400 p-2 rounded text-[11px] font-mono overflow-x-auto">
+                  <pre>{`import { Probato } from '@probato/sdk';
+
+const client = new Probato({
+  apiKey: 'pb_live_your_key_here',
+});
+
+// List projects
+const { items } = await client.projects.list();
+
+// Discover features (6 credits)
+await client.discovery.discover({
+  url: 'https://your-app.com',
+});
+
+// Trigger test run (2 credits)
+await client.projects.triggerTestRun(projectId);`}</pre>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Create New Key */}
+            {newlyCreatedKey && (
+              <Card className="border-emerald bg-emerald/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-emerald flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    API Key Created — Save It Now!
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-white p-2 rounded text-xs font-mono break-all">{newlyCreatedKey}</code>
+                    <Button size="sm" variant="outline" onClick={() => copyToClipboard(newlyCreatedKey)}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-warm-red mt-2">This key will not be shown again. Copy it now.</p>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex gap-2">
+              <Input
+                placeholder="Key name (e.g. CI/CD Pipeline)"
+                value={newKeyName}
+                onChange={(e) => setNewKeyName(e.target.value)}
+                className="flex-1"
+              />
+              <div className="flex gap-1">
+                {["read", "write"].map((scope) => (
+                  <Button
+                    key={scope}
+                    size="sm"
+                    variant={newKeyScopes.includes(scope) ? "default" : "outline"}
+                    onClick={() =>
+                      setNewKeyScopes((prev) =>
+                        prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]
+                      )
+                    }
+                    className="text-xs h-9"
+                  >
+                    {scope}
+                  </Button>
+                ))}
+              </div>
+              <Button onClick={createApiKey} disabled={creatingKey || !newKeyName.trim()}>
+                {creatingKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </Button>
+            </div>
+
+            {/* Existing Keys */}
+            {apiKeysLoading ? (
+              <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-deep-indigo" /></div>
+            ) : apiKeys.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No API keys yet. Create one above.</p>
+            ) : (
+              <div className="space-y-2">
+                {apiKeys.map((key) => (
+                  <div key={key.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-2 w-2 rounded-full ${key.enabled ? "bg-emerald" : "bg-zinc-300"}`} />
+                      <div>
+                        <p className="text-sm font-medium">{key.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          <code>{key.prefix}...</code> &middot; Scopes: {key.scopes.join(", ")} &middot; {key.usageCount} req (30d)
+                          {key.lastUsedAt && <> &middot; Last used {new Date(key.lastUsedAt).toLocaleDateString()}</>}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {key.enabled && (
+                        <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => rotateApiKey(key.id)}>
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {key.enabled ? (
+                        <Button size="sm" variant="ghost" className="text-xs h-7 text-amber" onClick={() => revokeApiKey(key.id)}>
+                          Disable
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" className="text-xs h-7 text-warm-red" onClick={() => deleteApiKey(key.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Usage Stats */}
+            {apiUsageStats && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-deep-indigo" />
+                    API Usage (Last 7 Days)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-2xl font-bold text-deep-indigo">{apiUsageStats.aggregated.totalRequests}</p>
+                      <p className="text-xs text-muted-foreground">Requests</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-deep-indigo">{apiUsageStats.aggregated.totalCredits}</p>
+                      <p className="text-xs text-muted-foreground">Credits Used</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-deep-indigo">{apiUsageStats.aggregated.avgResponseTime}ms</p>
+                      <p className="text-xs text-muted-foreground">Avg Response</p>
+                    </div>
+                  </div>
+                  {apiUsageStats.statusBreakdown.length > 0 && (
+                    <div className="mt-3 flex gap-2">
+                      {apiUsageStats.statusBreakdown.map((s) => (
+                        <Badge key={s.statusCode} variant={s.statusCode < 400 ? "secondary" : "destructive"} className="text-xs">
+                          {s.statusCode}: {s.count}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* API Docs Link */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <BookOpen className="h-3 w-3" />
+              <span>OpenAPI spec at <code>/api/v1/docs</code> &middot; Health check at <code>/api/v1/health</code></span>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Billing Dialog */}
       <Dialog open={showBillingPanel} onOpenChange={setShowBillingPanel}>

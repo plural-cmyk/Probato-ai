@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { captureForVisualRegression } from "@/lib/visual/compare";
 
 export async function POST(request: NextRequest) {
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify project belongs to user
-    const project = await prisma.project.findFirst({
+    const project = await db.project.findFirst({
       where: { id: projectId, userId: session.user.id },
     });
     if (!project) {
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Upsert baseline: create or update if same unique key exists
-    const baseline = await prisma.visualBaseline.upsert({
+    const baseline = await db.visualBaseline.upsert({
       where: {
         projectId_name_url_selector_viewportWidth_viewportHeight: {
           projectId,

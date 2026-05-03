@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 
 export async function GET(
   request: NextRequest,
@@ -22,7 +22,7 @@ export async function GET(
     }
 
     const { id } = await params;
-    const baseline = await prisma.visualBaseline.findFirst({
+    const baseline = await db.visualBaseline.findFirst({
       where: { id, userId: session.user.id },
       include: {
         project: {
@@ -75,7 +75,7 @@ export async function PATCH(
     const body = await request.json();
     const { name, approvedAt } = body;
 
-    const baseline = await prisma.visualBaseline.findFirst({
+    const baseline = await db.visualBaseline.findFirst({
       where: { id, userId: session.user.id },
     });
 
@@ -83,7 +83,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Baseline not found" }, { status: 404 });
     }
 
-    const updated = await prisma.visualBaseline.update({
+    const updated = await db.visualBaseline.update({
       where: { id },
       data: {
         ...(name !== undefined && { name }),
@@ -118,7 +118,7 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    const baseline = await prisma.visualBaseline.findFirst({
+    const baseline = await db.visualBaseline.findFirst({
       where: { id, userId: session.user.id },
     });
 
@@ -127,8 +127,8 @@ export async function DELETE(
     }
 
     // Delete all associated diffs first (cascade should handle this, but be explicit)
-    await prisma.visualDiff.deleteMany({ where: { baselineId: id } });
-    await prisma.visualBaseline.delete({ where: { id } });
+    await db.visualDiff.deleteMany({ where: { baselineId: id } });
+    await db.visualBaseline.delete({ where: { id } });
 
     return NextResponse.json({ message: "Baseline deleted" });
   } catch (error) {
