@@ -617,3 +617,43 @@ M11: Visual Regression Testing    ✅
 M12: Notifications & Alerts       ✅
 M13: Billing & Subscription       ✅
 M14: Public API & Developer SDK   🔲
+
+---
+Task ID: 14
+Agent: Main Agent
+Task: M14 — Public API & Developer SDK
+
+Work Log:
+- Added ApiKey + ApiUsage Prisma models (API key management with scopes, hashing, rate limits, usage tracking)
+- Generated Prisma client with new models
+- Built API key management service (src/lib/api/keys.ts) — scrypt hashing, CRUD, rotation, verification, usage stats
+- Built rate limiting middleware (src/lib/api/rate-limiter.ts) — per-plan token-bucket, in-memory store, rate limit headers
+- Built API auth middleware (src/lib/api/middleware.ts) — dual auth (Bearer API key OR NextAuth session), scope checking
+- Created versioned API routes (/api/v1/) covering: health, projects, features, test-runs, discover, generate, schedules, visual regression, billing, credits, subscription, usage
+- Created API key management routes (/api/api-keys/) — list, create, update, delete, rotate
+- Built OpenAPI 3.0.3 specification generator (src/lib/api/openapi.ts) served at /api/v1/docs
+- Built JavaScript/TypeScript SDK package (sdk/) with:
+  - HTTP client with auth, rate limit parsing, error handling
+  - Resource classes: Projects, Discovery, Generation, Schedules, Visual, Billing, Usage
+  - Custom error classes: AuthenticationError, RateLimitError, InsufficientCreditsError, etc.
+  - Full TypeScript types
+- Added API Keys & Developer Access dialog to dashboard:
+  - Quick Start code example with SDK usage
+  - Create/revoke/rotate/delete API keys
+  - Scope selection (read/write)
+  - One-time key display with copy button
+  - 7-day API usage stats
+  - OpenAPI spec link
+- Fixed pre-existing bugs: prisma->db imports in visual routes, getBillingSummary import
+- Installed stripe package for billing gateway
+- Build passes successfully
+
+Stage Summary:
+- M14 (Public API & Developer SDK) is COMPLETE
+- 20+ new API route files under /api/v1/
+- Full SDK package with TypeScript types at /sdk/
+- API key auth with scrypt hashing, scope-based access control
+- Per-plan rate limiting (Free: 10/min, Pro: 60/min, Team: 120/min, Enterprise: 300/min)
+- OpenAPI 3.0.3 spec at /api/v1/docs
+- Dashboard UI for API key management and usage stats
+- All code pushed to GitHub
