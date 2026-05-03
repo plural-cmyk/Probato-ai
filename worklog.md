@@ -184,3 +184,70 @@ Total API Routes: 18
 Total Pages: 5 (/, /auth/signin, /dashboard, /dashboard/projects/[id], /_not-found)
 Key Agent Files: actions.ts, test-executor.ts, feature-discovery.ts, test-generator.ts, auto-heal.ts, dependency-graph.ts
 Key Browser: chromium.ts (4-tier: Browserless → WS Endpoint → Sparticuz → Local)
+
+---
+Task ID: 9
+Agent: main
+Task: Phase 2 Milestone 9 - GitHub CI/CD Integration
+
+Work Log:
+- Added 3 new Prisma models: Installation, Repository, WebhookEvent
+- Created GitHub App service (src/lib/github/app.ts):
+  - JWT generation for GitHub App authentication (RS256)
+  - Installation access token management with DB caching
+  - GitHub API client (authenticated calls on behalf of installations)
+  - Check Run creation/update for commit status checks
+  - PR comment posting, finding, and updating
+  - Test report formatter (Markdown tables, failed steps, badges)
+  - Webhook signature verification (HMAC-SHA256)
+- Created Webhook Event Processor (src/lib/github/webhook-processor.ts):
+  - Handles installation events (created, deleted, suspend, unsuspend)
+  - Handles push events: auto-triggers tests on branch push
+  - Handles pull_request events: auto-triggers tests on PR open/sync/reopen
+  - Creates GitHub Check Runs (queued → in_progress → completed)
+  - Posts PR comments with test results (creates or updates existing)
+  - Auto-creates projects for new repos
+  - Persists test runs and results to DB
+- Created API routes:
+  - POST /api/webhooks/github — receives GitHub webhook events
+  - GET /api/webhooks/github — health check endpoint
+  - GET /api/installations — list installations with repos + recent events
+  - PATCH /api/installations — toggle repo CI/CD enablement
+- Updated Dashboard with CI/CD Integration panel:
+  - Shows GitHub App installations with status badges
+  - Lists repositories per installation with enable/disable toggle
+  - Recent webhook events feed with processing status
+  - Refresh button to sync from GitHub API
+- Installed dependencies: jsonwebtoken, @types/jsonwebtoken, vitest
+- Added test scripts to package.json (npm test / npm run test:watch)
+- Wrote 23 tests covering:
+  - Test report formatting (passed, failed, error, no-failed-steps)
+  - Webhook signature verification (HMAC-SHA256 correctness)
+  - Event classification (push vs tag, PR trigger actions)
+  - Check run status mapping
+  - API route input validation
+  - Response format validation
+  - Installations API structure
+- All 23 tests passing
+- Build verified — 22 routes compile cleanly
+- Pushed to GitHub (commit 0ce3e3c)
+
+Stage Summary:
+- ✅ Milestone 9 COMPLETE — GitHub CI/CD Integration
+- Webhook endpoint at /api/webhooks/github receives push/PR events
+- Auto-triggers test runs on push to watched branches
+- Auto-triggers test runs on PR open/synchronize/reopen
+- Posts GitHub Check Runs (commit status checks) ✅/❌
+- Posts PR comments with test result reports
+- Installation management with repository enable/disable
+- Environment variables needed: GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_WEBHOOK_SECRET
+
+═══════════════════════════════════════════════════════
+PHASE 2 PROGRESS
+═══════════════════════════════════════════════════════
+M9:  GitHub CI/CD Integration     ✅
+M10: Scheduled & Recurring Tests  🔲
+M11: Visual Regression Testing    🔲
+M12: Notifications & Alerts       🔲
+M13: Billing & Subscription       🔲
+M14: Public API & Developer SDK   🔲
