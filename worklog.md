@@ -319,3 +319,93 @@ Stage Summary:
 - Dashboard UI for creating, pausing, and deleting schedules
 - Missing /api/test/run route created (fixes dashboard test runner)
 - Environment variable: CRON_SECRET (optional, protects cron endpoint)
+
+---
+Task ID: 10b
+Agent: main
+Task: Remove Vercel Cron Configuration
+
+Work Log:
+- Removed `crons` array from vercel.json (was running /api/cron/run-schedules every 5 minutes)
+- Removed maxDuration: 300 for the cron route from vercel.json
+- Kept scheduler engine, API routes, and cron trigger endpoint intact for future use
+- User will revisit cron scheduling later
+
+Stage Summary:
+- ✅ Vercel cron removed from vercel.json
+- Schedule infrastructure (engine, API routes, DB models, UI) preserved for later
+- Cron trigger endpoint still available for manual invocation
+
+---
+Task ID: 11
+Agent: main
+Task: Phase 2 Milestone 11 - Visual Regression Testing
+
+Work Log:
+- Added 2 new Prisma models: VisualBaseline, VisualDiff
+  - VisualBaseline: stores baseline screenshots (name, url, selector, viewport, screenshot, approvedAt)
+  - VisualDiff: stores comparison results (status, mismatchPercent, mismatchPixels, totalPixels, threshold, currentScreenshot, diffScreenshot, reviewNote)
+  - Unique constraint on (projectId, name, url, selector, viewportWidth, viewportHeight)
+  - Added visualBaselines/visualDiffs relations to User, Project, TestRun models
+- Created Visual Comparison Engine (src/lib/visual/compare.ts):
+  - compareScreenshots(): pixel-level image comparison using Sharp
+    - Decodes both base64 PNGs, normalizes dimensions, compares RGBA pixel data
+    - Configurable per-pixel threshold (default 0.1) for anti-aliasing tolerance
+    - Generates diff image with configurable highlight color (default red)
+    - Returns mismatch percentage, pixel counts, diff image base64
+  - createCompositeDiff(): overlays diff on current screenshot for review
+  - captureForVisualRegression(): captures baseline screenshots via Puppeteer
+    - Supports full-page or element-specific (CSS selector) capture
+    - Configurable viewport dimensions, wait selectors
+  - Utility functions: generateBlankImage, getImageDimensions, resizeImage
+  - Weighted pixel difference calculation: RGB (85%) + Alpha (15%)
+- Created API routes:
+  - POST /api/visual/capture — capture baseline screenshot (upsert if exists)
+  - POST /api/visual/compare — compare current vs baseline, creates VisualDiff record
+  - GET /api/visual/baselines — list baselines (excludes screenshot for performance)
+  - GET /api/visual/baselines/[id] — get baseline with recent diffs
+  - PATCH /api/visual/baselines/[id] — update baseline name/approval
+  - DELETE /api/visual/baselines/[id] — delete baseline and associated diffs
+  - GET /api/visual/diffs — list diffs with filtering (projectId, baselineId, status)
+  - GET /api/visual/diffs/[id] — get diff with full screenshots for review
+  - PATCH /api/visual/diffs/[id] — approve/reject diff
+    - Approving updates the baseline screenshot with the current one
+    - Rejecting keeps the original baseline
+- Updated Dashboard with Visual Regression panel:
+  - Capture Baseline form (name, URL, optional CSS selector)
+  - Baselines list with name, URL, selector, viewport, diff count, approved badge
+  - Per-baseline: Compare button, Delete button
+  - Pending Diffs list with mismatch percentage, pixel counts
+  - Per-diff: View, Accept, Reject buttons
+  - Diff Detail Viewer: side-by-side baseline vs current vs diff overlay
+  - Accept/Reject buttons in detail view with clear descriptions
+  - Empty state with helpful message
+- Wrote 18 tests covering:
+  - Identical images (0% mismatch)
+  - Completely different images (100% mismatch)
+  - Threshold parameter (strict vs lenient)
+  - maxMismatchPercent parameter
+  - Diff image generation (valid PNG, correct dimensions)
+  - Transparent diff for identical images
+  - Red pixel detection in diff for different images
+  - Custom diff colors (green)
+  - Different-sized images (resize to baseline)
+  - Mismatch percent rounding (2 decimal places)
+  - Composite diff generation
+  - Blank image generation
+  - Image dimensions retrieval
+  - Image resizing
+  - Edge cases: 1x1 images, small differences below threshold, alpha channel differences
+- All 79 tests passing (13 M9 + 38 M10 + 18 M11 + 10 webhook)
+- Build verified — 33 routes compile cleanly (6 new visual routes)
+- Prisma client regenerated
+
+Stage Summary:
+- ✅ Milestone 11 COMPLETE — Visual Regression Testing
+- Visual comparison engine using Sharp (no additional dependencies needed)
+- Pixel-level comparison with configurable threshold and custom diff colors
+- Full baseline lifecycle: capture → compare → review → approve/reject
+- Approving a diff automatically updates the baseline screenshot
+- Dashboard UI with capture form, baseline list, pending diffs, and side-by-side diff viewer
+- 6 new API routes under /api/visual/
+- 2 new Prisma models: VisualBaseline, VisualDiff

@@ -66,10 +66,11 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts   Account[]
-  sessions   Session[]
-  projects   Project[]
-  schedules  Schedule[]
+  accounts        Account[]
+  sessions        Session[]
+  projects        Project[]
+  schedules       Schedule[]
+  visualBaselines VisualBaseline[]
 }
 
 model Project {
@@ -87,9 +88,11 @@ model Project {
 
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  features  Feature[]
-  testRuns  TestRun[]
-  schedules Schedule[]
+  features        Feature[]
+  testRuns        TestRun[]
+  schedules       Schedule[]
+  visualBaselines VisualBaseline[]
+  visualDiffs     VisualDiff[]
 
   @@index([userId])
 }
@@ -131,6 +134,8 @@ model TestRun {
 
   scheduleId String?
   schedule   Schedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+
+  visualDiffs VisualDiff[]
 
   @@index([projectId])
   @@index([status])
@@ -266,4 +271,64 @@ model Schedule {
   @@index([userId])
   @@index([enabled])
   @@index([nextRunAt])
+}
+
+// ============================================
+// Phase 2: Visual Regression Testing
+// ============================================
+
+model VisualBaseline {
+  id            String   @id @default(cuid())
+  name          String   // Human-readable name, e.g. "Homepage Hero", "Login Form"
+  url           String   // Page URL that was captured
+  selector      String?  // Optional CSS selector for element-specific captures
+  viewportWidth  Int     @default(1280)
+  viewportHeight Int     @default(720)
+  screenshot    String   // Base64-encoded PNG screenshot (the baseline image)
+  captureIndex  Int      @default(0) // Step index in test run (for multi-step captures)
+  approvedAt    DateTime? // When the baseline was last approved/updated
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  diffs     VisualDiff[]
+
+  @@unique([projectId, name, url, selector, viewportWidth, viewportHeight])
+  @@index([projectId])
+  @@index([userId])
+  @@index([url])
+}
+
+model VisualDiff {
+  id               String   @id @default(cuid())
+  status           String   @default("pending") // pending, approved, rejected
+  mismatchPercent  Float    @default(0) // Percentage of pixels that differ (0-100)
+  mismatchPixels   Int      @default(0) // Raw number of pixels that differ
+  totalPixels      Int      @default(0) // Total pixels compared
+  threshold        Float    @default(0.1) // Per-pixel difference threshold (0-1)
+  currentScreenshot String  // Base64-encoded PNG of the current capture
+  diffScreenshot   String?  // Base64-encoded PNG highlighting differences (red pixels)
+  reviewNote       String?  // Optional note when approving/rejecting
+  reviewedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  baselineId String
+  baseline   VisualBaseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  testRunId  String?
+  testRun    TestRun? @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  @@index([baselineId])
+  @@index([projectId])
+  @@index([status])
+  @@index([testRunId])
+  @@index([createdAt])
 }

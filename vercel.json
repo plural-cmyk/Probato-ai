@@ -5,15 +5,6 @@
     },
     "src/app/api/test/run/route.ts": {
       "memory": 2048
-    },
-    "src/app/api/cron/run-schedules/route.ts": {
-      "maxDuration": 300
     }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/run-schedules",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  }
 }

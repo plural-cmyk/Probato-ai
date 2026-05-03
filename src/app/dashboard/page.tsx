@@ -42,6 +42,10 @@ import {
   CalendarClock,
   Pause,
   PlayCircle,
+  ImageDiff,
+  ThumbsUp,
+  ThumbsDown,
+  ScanEye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -340,6 +344,48 @@ export default function DashboardPage() {
   const [newSchedulePreset, setNewSchedulePreset] = useState("smoke");
   const [newScheduleCron, setNewScheduleCron] = useState("0 9 * * 1-5");
   const [creatingSchedule, setCreatingSchedule] = useState(false);
+
+  // Visual Regression state
+  const [visualBaselines, setVisualBaselines] = useState<{
+    id: string;
+    name: string;
+    url: string;
+    selector: string | null;
+    viewportWidth: number;
+    viewportHeight: number;
+    approvedAt: string | null;
+    createdAt: string;
+    project: { id: string; name: string } | null;
+    _count: { diffs: number };
+  }[]>([]);
+  const [visualDiffs, setVisualDiffs] = useState<{
+    id: string;
+    status: string;
+    mismatchPercent: number;
+    mismatchPixels: number;
+    totalPixels: number;
+    threshold: number;
+    createdAt: string;
+    baseline: { id: string; name: string; url: string };
+    project: { id: string; name: string };
+  }[]>([]);
+  const [visualLoading, setVisualLoading] = useState(false);
+  const [newBaselineName, setNewBaselineName] = useState("");
+  const [newBaselineUrl, setNewBaselineUrl] = useState("https://probato-ai.vercel.app");
+  const [newBaselineSelector, setNewBaselineSelector] = useState("");
+  const [capturingBaseline, setCapturingBaseline] = useState(false);
+  const [selectedDiffId, setSelectedDiffId] = useState<string | null>(null);
+  const [diffDetail, setDiffDetail] = useState<{
+    id: string;
+    status: string;
+    mismatchPercent: number;
+    mismatchPixels: number;
+    totalPixels: number;
+    threshold: number;
+    currentScreenshot: string;
+    diffScreenshot: string | null;
+    baseline: { id: string; name: string; url: string; screenshot: string };
+  } | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -819,6 +865,123 @@ export default function DashboardPage() {
       await loadSchedules();
     } catch (error) {
       console.error("Failed to delete schedule:", error);
+    }
+  }
+
+  // ── Visual Regression functions ─────────────────────────────────
+
+  async function loadVisualBaselines() {
+    setVisualLoading(true);
+    try {
+      const res = await fetch("/api/visual/baselines");
+      if (res.ok) {
+        const data = await res.json();
+        setVisualBaselines(data.baselines ?? []);
+      }
+    } catch (error) {
+      console.error("Failed to load visual baselines:", error);
+    } finally {
+      setVisualLoading(false);
+    }
+  }
+
+  async function loadVisualDiffs() {
+    try {
+      const res = await fetch("/api/visual/diffs?status=pending");
+      if (res.ok) {
+        const data = await res.json();
+        setVisualDiffs(data.diffs ?? []);
+      }
+    } catch (error) {
+      console.error("Failed to load visual diffs:", error);
+    }
+  }
+
+  async function captureBaseline() {
+    if (!newBaselineName.trim() || !newBaselineUrl.trim() || projects.length === 0) return;
+    setCapturingBaseline(true);
+    try {
+      const res = await fetch("/api/visual/capture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: projects[0].id,
+          name: newBaselineName.trim(),
+          url: newBaselineUrl.trim(),
+          selector: newBaselineSelector.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        setNewBaselineName("");
+        setNewBaselineSelector("");
+        await loadVisualBaselines();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to capture baseline");
+      }
+    } catch (error) {
+      console.error("Failed to capture baseline:", error);
+      alert("Failed to capture baseline. The browser service may be unavailable.");
+    } finally {
+      setCapturingBaseline(false);
+    }
+  }
+
+  async function deleteBaseline(baselineId: string) {
+    try {
+      await fetch(`/api/visual/baselines/${baselineId}`, { method: "DELETE" });
+      await loadVisualBaselines();
+      await loadVisualDiffs();
+    } catch (error) {
+      console.error("Failed to delete baseline:", error);
+    }
+  }
+
+  async function compareBaseline(baselineId: string, url: string) {
+    try {
+      const res = await fetch("/api/visual/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baselineId, url, threshold: 0.1 }),
+      });
+      if (res.ok) {
+        await loadVisualDiffs();
+        await loadVisualBaselines();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to compare");
+      }
+    } catch (error) {
+      console.error("Failed to compare:", error);
+    }
+  }
+
+  async function viewDiff(diffId: string) {
+    try {
+      const res = await fetch(`/api/visual/diffs/${diffId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDiffDetail(data.diff);
+        setSelectedDiffId(diffId);
+      }
+    } catch (error) {
+      console.error("Failed to load diff:", error);
+    }
+  }
+
+  async function reviewDiff(diffId: string, status: "approved" | "rejected") {
+    try {
+      await fetch(`/api/visual/diffs/${diffId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      setDiffDetail(null);
+      setSelectedDiffId(null);
+      await loadVisualDiffs();
+      await loadVisualBaselines();
+    } catch (error) {
+      console.error("Failed to review diff:", error);
     }
   }
 
@@ -2391,6 +2554,273 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Visual Regression Section */}
+        <Card className="mb-8 border-border/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10">
+                  <ScanEye className="h-4 w-4 text-rose-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Visual Regression</CardTitle>
+                  <CardDescription className="text-xs">
+                    Capture baselines, detect visual changes, review diffs
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { loadVisualBaselines(); loadVisualDiffs(); }}
+                disabled={visualLoading}
+              >
+                {visualLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+                Refresh
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Capture Baseline Form */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Capture New Baseline</Label>
+                <div className="flex gap-2 flex-col sm:flex-row">
+                  <Input
+                    placeholder="Baseline name (e.g. Homepage)"
+                    value={newBaselineName}
+                    onChange={(e) => setNewBaselineName(e.target.value)}
+                    className="sm:flex-1 text-sm"
+                  />
+                  <Input
+                    placeholder="https://example.com"
+                    value={newBaselineUrl}
+                    onChange={(e) => setNewBaselineUrl(e.target.value)}
+                    className="sm:flex-1 text-sm font-mono"
+                  />
+                  <Input
+                    placeholder="CSS selector (optional)"
+                    value={newBaselineSelector}
+                    onChange={(e) => setNewBaselineSelector(e.target.value)}
+                    className="sm:w-40 text-sm font-mono"
+                  />
+                  <Button
+                    className="bg-rose-500 hover:bg-rose-600 text-white shrink-0"
+                    onClick={captureBaseline}
+                    disabled={capturingBaseline || !newBaselineName.trim() || !newBaselineUrl.trim() || projects.length === 0}
+                  >
+                    {capturingBaseline ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Camera className="mr-1.5 h-4 w-4" />}
+                    {capturingBaseline ? "Capturing..." : "Capture"}
+                  </Button>
+                </div>
+                {projects.length === 0 && (
+                  <p className="text-xs text-amber">Create a project first to capture baselines.</p>
+                )}
+              </div>
+
+              {/* Baselines List */}
+              {visualBaselines.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Baselines ({visualBaselines.length})</Label>
+                  <div className="space-y-2">
+                    {visualBaselines.map((baseline) => (
+                      <div key={baseline.id} className="rounded-lg border p-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ImageDiff className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">{baseline.name}</span>
+                            {baseline.approvedAt && (
+                              <Badge variant="outline" className="text-xs bg-emerald/10 text-emerald border-emerald/20">
+                                Approved
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7"
+                              onClick={() => compareBaseline(baseline.id, baseline.url)}
+                            >
+                              <ScanEye className="h-3 w-3 mr-1" />
+                              Compare
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteBaseline(baseline.id)}
+                              className="text-warm-red hover:text-warm-red h-7"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="font-mono truncate">{baseline.url}</span>
+                          {baseline.selector && (
+                            <span className="font-mono bg-zinc-100 px-1.5 py-0.5 rounded">{baseline.selector}</span>
+                          )}
+                          <span>{baseline.viewportWidth}x{baseline.viewportHeight}</span>
+                          {baseline._count.diffs > 0 && (
+                            <span>{baseline._count.diffs} diffs</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pending Diffs */}
+              {visualDiffs.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">
+                    Pending Reviews ({visualDiffs.length})
+                  </Label>
+                  <div className="space-y-2">
+                    {visualDiffs.map((diff) => (
+                      <div key={diff.id} className="rounded-lg border border-amber/30 bg-amber/5 p-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber" />
+                            <span className="text-sm font-medium">{diff.baseline.name}</span>
+                            <Badge variant="outline" className="text-xs bg-warm-red/10 text-warm-red border-warm-red/20">
+                              {diff.mismatchPercent.toFixed(2)}% diff
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7"
+                              onClick={() => viewDiff(diff.id)}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7 text-emerald hover:text-emerald"
+                              onClick={() => reviewDiff(diff.id, "approved")}
+                            >
+                              <ThumbsUp className="h-3 w-3 mr-1" />
+                              Accept
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7 text-warm-red hover:text-warm-red"
+                              onClick={() => reviewDiff(diff.id, "rejected")}
+                            >
+                              <ThumbsDown className="h-3 w-3 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-mono">{diff.baseline.url}</span>
+                          <span className="ml-3">{diff.mismatchPixels.toLocaleString()} / {diff.totalPixels.toLocaleString()} pixels</span>
+                          <span className="ml-3">{new Date(diff.createdAt).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Diff Detail Viewer */}
+              {diffDetail && (
+                <div className="space-y-3 rounded-lg border border-rose-200 bg-rose-50/50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ImageDiff className="h-5 w-5 text-rose-500" />
+                      <span className="text-sm font-semibold">Visual Diff: {diffDetail.baseline.name}</span>
+                      <Badge variant="outline" className="text-xs bg-warm-red/10 text-warm-red border-warm-red/20">
+                        {diffDetail.mismatchPercent.toFixed(2)}% mismatch
+                      </Badge>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => { setDiffDetail(null); setSelectedDiffId(null); }}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Baseline */}
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Baseline</p>
+                      <div className="rounded border overflow-hidden bg-white">
+                        <img
+                          src={`data:image/png;base64,${diffDetail.baseline.screenshot}`}
+                          alt="Baseline screenshot"
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                    {/* Current */}
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Current</p>
+                      <div className="rounded border overflow-hidden bg-white">
+                        <img
+                          src={`data:image/png;base64,${diffDetail.currentScreenshot}`}
+                          alt="Current screenshot"
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                    {/* Diff */}
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-rose-500">Diff (red = changed)</p>
+                      <div className="rounded border overflow-hidden bg-white">
+                        {diffDetail.diffScreenshot ? (
+                          <img
+                            src={`data:image/png;base64,${diffDetail.diffScreenshot}`}
+                            alt="Diff overlay"
+                            className="w-full"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
+                            No diff image
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{diffDetail.mismatchPixels.toLocaleString()} / {diffDetail.totalPixels.toLocaleString()} pixels differ</span>
+                    <span>Threshold: {(diffDetail.threshold * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="bg-emerald hover:bg-emerald/90 text-white"
+                      onClick={() => reviewDiff(diffDetail.id, "approved")}
+                    >
+                      <ThumbsUp className="mr-1.5 h-4 w-4" />
+                      Accept (update baseline)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="text-warm-red hover:text-warm-red"
+                      onClick={() => reviewDiff(diffDetail.id, "rejected")}
+                    >
+                      <ThumbsDown className="mr-1.5 h-4 w-4" />
+                      Reject (keep baseline)
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {visualBaselines.length === 0 && visualDiffs.length === 0 && !visualLoading && (
+                <div className="text-center py-6 text-muted-foreground">
+                  <ScanEye className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No visual baselines yet.</p>
+                  <p className="text-xs">Capture a baseline screenshot to start detecting visual changes.</p>
                 </div>
               )}
             </div>
