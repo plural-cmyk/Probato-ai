@@ -246,8 +246,76 @@ Stage Summary:
 PHASE 2 PROGRESS
 ═══════════════════════════════════════════════════════
 M9:  GitHub CI/CD Integration     ✅
-M10: Scheduled & Recurring Tests  🔲
+M10: Scheduled & Recurring Tests  ✅
 M11: Visual Regression Testing    🔲
 M12: Notifications & Alerts       🔲
 M13: Billing & Subscription       🔲
 M14: Public API & Developer SDK   🔲
+
+---
+Task ID: 10
+Agent: main
+Task: Phase 2 Milestone 10 - Scheduled & Recurring Tests
+
+Work Log:
+- Added Schedule model to Prisma schema with fields: name, url, preset, cronExpression, enabled, lastRunAt, lastRunStatus, lastRunId, nextRunAt, runCount, failCount
+- Added scheduleId to TestRun model (optional FK to Schedule)
+- Added schedules relation to User and Project models
+- Updated TestRun.triggeredBy to include "schedule" as a valid trigger type
+- Created Scheduler Engine (src/lib/scheduler/engine.ts):
+  - Custom cron expression parser (no external deps): supports *, specific values, ranges (1-5), steps (*/5), comma-separated
+  - getNextRunTime(): calculates next execution time from a cron expression
+  - describeCron(): converts cron to human-readable descriptions
+  - buildPresetActions(): maps preset names to TestAction[] sequences
+  - validateCronExpression(): validates cron and returns description + nextRun
+  - executeDueSchedules(): finds all enabled schedules with nextRunAt <= now and runs them
+  - executeSchedule(): runs a single schedule, persists TestRun + TestResult records
+  - recalculateNextRuns(): bulk recalculates nextRunAt for all enabled schedules
+- Created Schedule CRUD API routes:
+  - GET /api/schedules — list user's schedules with project info
+  - POST /api/schedules — create schedule with cron validation
+  - GET /api/schedules/[id] — get schedule with recent test runs
+  - PATCH /api/schedules/[id] — update schedule (name, url, preset, cron, enabled, project)
+  - DELETE /api/schedules/[id] — delete schedule
+- Created Cron Trigger endpoint:
+  - POST /api/cron/run-schedules — called by Vercel Cron every 5 minutes
+  - GET /api/cron/run-schedules — health check
+  - Protected by CRON_SECRET environment variable
+  - Recalculates nextRunAt for schedules missing it
+  - Executes all due schedules and returns summary
+- Created /api/test/run route (was missing — dashboard referenced it but file didn't exist)
+  - POST endpoint with preset-based or custom action test execution
+  - Persists TestRun and TestResult records
+  - Shares buildPresetActions from scheduler engine
+- Updated vercel.json:
+  - Added crons config: runs /api/cron/run-schedules every 5 minutes
+  - Added maxDuration: 300 for the cron route
+- Updated Dashboard with Scheduled Tests panel:
+  - Create schedule form (name, URL, preset, cron expression)
+  - Common cron patterns hint
+  - Schedule list with Active/Paused status badges
+  - Per-schedule: last run status, next run time, run count, fail count
+  - Pause/Enable toggle button per schedule
+  - Delete button per schedule
+  - Refresh button to reload schedules
+- Created vitest.config.ts with @/ alias resolution
+- Wrote 38 tests covering:
+  - Cron expression parsing (wildcards, specific, range, step, range+step, comma, invalid)
+  - Next run time calculation (daily, skip-to-next-day, weekday-skip, every-30-min)
+  - Cron validation (valid, invalid, edge cases)
+  - Human-readable descriptions (every 5/15/30 min, daily, weekdays, Sundays, Saturdays, fallback)
+  - Preset action building (smoke, navigation, login, form, full-page-screenshot, unknown)
+  - Cron field validation edge cases (midnight, noon, every-6-hours, out-of-range)
+- All 61 tests passing (23 M9 + 38 M10)
+- Build verified
+- Prisma client regenerated
+
+Stage Summary:
+- ✅ Milestone 10 COMPLETE — Scheduled & Recurring Tests
+- Schedule CRUD API at /api/schedules and /api/schedules/[id]
+- Cron trigger endpoint at /api/cron/run-schedules (called every 5 min by Vercel Cron)
+- Custom cron parser with no external dependencies
+- Preset-based test actions shared between manual and scheduled runs
+- Dashboard UI for creating, pausing, and deleting schedules
+- Missing /api/test/run route created (fixes dashboard test runner)
+- Environment variable: CRON_SECRET (optional, protects cron endpoint)

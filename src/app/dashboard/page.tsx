@@ -39,6 +39,9 @@ import {
   Webhook,
   GitBranch,
   ToggleLeft,
+  CalendarClock,
+  Pause,
+  PlayCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -315,6 +318,28 @@ export default function DashboardPage() {
     syncedFromGitHub: boolean;
   } | null>(null);
   const [ciLoading, setCiLoading] = useState(false);
+
+  // Schedule state
+  const [schedules, setSchedules] = useState<{
+    id: string;
+    name: string;
+    url: string;
+    preset: string;
+    cronExpression: string;
+    enabled: boolean;
+    lastRunAt: string | null;
+    lastRunStatus: string | null;
+    nextRunAt: string | null;
+    runCount: number;
+    failCount: number;
+    project: { id: string; name: string } | null;
+  }[]>([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(false);
+  const [newScheduleName, setNewScheduleName] = useState("");
+  const [newScheduleUrl, setNewScheduleUrl] = useState("https://probato-ai.vercel.app");
+  const [newSchedulePreset, setNewSchedulePreset] = useState("smoke");
+  const [newScheduleCron, setNewScheduleCron] = useState("0 9 * * 1-5");
+  const [creatingSchedule, setCreatingSchedule] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -727,6 +752,73 @@ export default function DashboardPage() {
       await loadCiData();
     } catch (error) {
       console.error("Failed to toggle repo:", error);
+    }
+  }
+
+  async function loadSchedules() {
+    setSchedulesLoading(true);
+    try {
+      const res = await fetch("/api/schedules");
+      if (res.ok) {
+        const data = await res.json();
+        setSchedules(data.schedules ?? []);
+      }
+    } catch (error) {
+      console.error("Failed to load schedules:", error);
+    } finally {
+      setSchedulesLoading(false);
+    }
+  }
+
+  async function createSchedule() {
+    if (!newScheduleName.trim() || !newScheduleUrl.trim()) return;
+    setCreatingSchedule(true);
+    try {
+      const res = await fetch("/api/schedules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newScheduleName.trim(),
+          url: newScheduleUrl.trim(),
+          preset: newSchedulePreset,
+          cronExpression: newScheduleCron,
+        }),
+      });
+      if (res.ok) {
+        setNewScheduleName("");
+        await loadSchedules();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to create schedule");
+      }
+    } catch (error) {
+      console.error("Failed to create schedule:", error);
+    } finally {
+      setCreatingSchedule(false);
+    }
+  }
+
+  async function toggleScheduleEnabled(scheduleId: string, enabled: boolean) {
+    try {
+      await fetch(`/api/schedules/${scheduleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      await loadSchedules();
+    } catch (error) {
+      console.error("Failed to toggle schedule:", error);
+    }
+  }
+
+  async function deleteSchedule(scheduleId: string) {
+    try {
+      await fetch(`/api/schedules/${scheduleId}`, {
+        method: "DELETE",
+      });
+      await loadSchedules();
+    } catch (error) {
+      console.error("Failed to delete schedule:", error);
     }
   }
 
@@ -2094,6 +2186,214 @@ export default function DashboardPage() {
                 </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Scheduled Tests Section */}
+        <Card className="mb-8 border-border/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber/10">
+                  <CalendarClock className="h-4 w-4 text-amber" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Scheduled Tests</CardTitle>
+                  <CardDescription className="text-xs">
+                    Schedule recurring browser tests with cron expressions
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadSchedules}
+                disabled={schedulesLoading}
+              >
+                {schedulesLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Create Schedule Form */}
+              <div className="space-y-3 p-4 rounded-lg border bg-zinc-50">
+                <h4 className="text-sm font-semibold text-deep-indigo flex items-center gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  New Schedule
+                </h4>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <Label className="text-xs mb-1">Name</Label>
+                    <Input
+                      placeholder="Daily Smoke Test"
+                      value={newScheduleName}
+                      onChange={(e) => setNewScheduleName(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs mb-1">URL</Label>
+                    <Input
+                      placeholder="https://your-app.com"
+                      value={newScheduleUrl}
+                      onChange={(e) => setNewScheduleUrl(e.target.value)}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs mb-1">Preset</Label>
+                    <Select value={newSchedulePreset} onValueChange={setNewSchedulePreset}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="smoke">Smoke Test</SelectItem>
+                        <SelectItem value="navigation">Navigation</SelectItem>
+                        <SelectItem value="login">Login Flow</SelectItem>
+                        <SelectItem value="form">Form Test</SelectItem>
+                        <SelectItem value="full-page-screenshot">Full Screenshot</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs mb-1">Schedule (cron)</Label>
+                    <Input
+                      placeholder="0 9 * * 1-5"
+                      value={newScheduleCron}
+                      onChange={(e) => setNewScheduleCron(e.target.value)}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Common: <code>*/30 * * * *</code> (30min), <code>0 9 * * 1-5</code> (weekdays 9am), <code>0 */6 * * *</code> (every 6h)
+                  </p>
+                  <Button
+                    size="sm"
+                    className="bg-amber hover:bg-amber/90 text-white"
+                    onClick={createSchedule}
+                    disabled={creatingSchedule || !newScheduleName.trim() || !newScheduleUrl.trim()}
+                  >
+                    {creatingSchedule ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="mr-1.5 h-4 w-4" />
+                    )}
+                    {creatingSchedule ? "Creating..." : "Create"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Existing Schedules List */}
+              {schedules.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No scheduled tests yet. Create one above to run tests automatically.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {schedules.map((schedule) => (
+                    <div
+                      key={schedule.id}
+                      className={`rounded-lg border p-3 flex items-center gap-3 ${
+                        schedule.enabled ? "bg-white" : "bg-zinc-50 opacity-70"
+                      }`}
+                    >
+                      {/* Status icon */}
+                      <div className="shrink-0">
+                        {schedule.enabled ? (
+                          <CalendarClock className="h-5 w-5 text-amber" />
+                        ) : (
+                          <CalendarClock className="h-5 w-5 text-zinc-400" />
+                        )}
+                      </div>
+
+                      {/* Schedule info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium truncate">{schedule.name}</span>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs shrink-0 ${
+                              schedule.enabled
+                                ? "bg-emerald/10 text-emerald border-emerald/20"
+                                : "bg-zinc-100 text-zinc-500 border-zinc-200"
+                            }`}
+                          >
+                            {schedule.enabled ? "Active" : "Paused"}
+                          </Badge>
+                          {schedule.lastRunStatus && (
+                            <Badge
+                              variant="outline"
+                              className={`text-xs shrink-0 ${
+                                schedule.lastRunStatus === "passed"
+                                  ? "bg-emerald/10 text-emerald border-emerald/20"
+                                  : schedule.lastRunStatus === "failed"
+                                  ? "bg-warm-red/10 text-warm-red border-warm-red/20"
+                                  : "bg-amber/10 text-amber border-amber/20"
+                              }`}
+                            >
+                              {schedule.lastRunStatus}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          <span className="font-mono truncate">{schedule.url}</span>
+                          <span className="shrink-0">
+                            <code className="bg-zinc-100 px-1.5 py-0.5 rounded">{schedule.cronExpression}</code>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          <span>{schedule.runCount} runs</span>
+                          {schedule.failCount > 0 && (
+                            <span className="text-warm-red">{schedule.failCount} failed</span>
+                          )}
+                          {schedule.nextRunAt && schedule.enabled && (
+                            <span className="text-emerald">
+                              Next: {new Date(schedule.nextRunAt).toLocaleString()}
+                            </span>
+                          )}
+                          {schedule.lastRunAt && (
+                            <span>
+                              Last: {new Date(schedule.lastRunAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleScheduleEnabled(schedule.id, schedule.enabled)}
+                          title={schedule.enabled ? "Pause schedule" : "Enable schedule"}
+                        >
+                          {schedule.enabled ? (
+                            <Pause className="h-4 w-4 text-amber" />
+                          ) : (
+                            <PlayCircle className="h-4 w-4 text-emerald" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteSchedule(schedule.id)}
+                          className="text-warm-red hover:text-warm-red"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </main>

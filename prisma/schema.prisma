@@ -69,6 +69,7 @@ model User {
   accounts   Account[]
   sessions   Session[]
   projects   Project[]
+  schedules  Schedule[]
 }
 
 model Project {
@@ -88,6 +89,7 @@ model Project {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   features  Feature[]
   testRuns  TestRun[]
+  schedules Schedule[]
 
   @@index([userId])
 }
@@ -116,7 +118,7 @@ model Feature {
 model TestRun {
   id        String   @id @default(cuid())
   status    String   @default("pending") // pending, running, passed, failed, error
-  triggeredBy String @default("manual") // manual, auto, auto-heal
+  triggeredBy String @default("manual") // manual, auto, auto-heal, push, pr, schedule
   startedAt DateTime?
   endedAt   DateTime?
   logs      String?  // Raw test output
@@ -127,8 +129,12 @@ model TestRun {
   project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   results    TestResult[]
 
+  scheduleId String?
+  schedule   Schedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+
   @@index([projectId])
   @@index([status])
+  @@index([scheduleId])
 }
 
 model TestResult {
@@ -227,4 +233,37 @@ model WebhookEvent {
   @@index([processed])
   @@index([installationId])
   @@index([createdAt])
+}
+
+// ============================================
+// Phase 2: Scheduled & Recurring Tests
+// ============================================
+
+model Schedule {
+  id              String   @id @default(cuid())
+  name            String   // Human-readable name, e.g. "Daily Smoke Test"
+  url             String   // Target URL to test
+  preset          String   @default("smoke") // smoke, navigation, login, form, full-page-screenshot
+  cronExpression  String   // Cron expression, e.g. "*/30 * * * *", "0 9 * * 1-5"
+  enabled         Boolean  @default(true)
+  lastRunAt       DateTime?
+  lastRunStatus   String?  // passed, failed, error
+  lastRunId       String?  // Link to last TestRun
+  nextRunAt       DateTime? // Calculated next execution time
+  runCount        Int      @default(0)
+  failCount       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  testRuns        TestRun[]
+
+  @@index([userId])
+  @@index([enabled])
+  @@index([nextRunAt])
 }
