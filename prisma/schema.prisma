@@ -71,6 +71,9 @@ model User {
   projects        Project[]
   schedules       Schedule[]
   visualBaselines VisualBaseline[]
+  notifications          Notification[]
+  notificationChannels   NotificationChannel[]
+  notificationPreferences NotificationPreference[]
 }
 
 model Project {
@@ -93,6 +96,7 @@ model Project {
   schedules       Schedule[]
   visualBaselines VisualBaseline[]
   visualDiffs     VisualDiff[]
+  notifications   Notification[]
 
   @@index([userId])
 }
@@ -136,6 +140,7 @@ model TestRun {
   schedule   Schedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
 
   visualDiffs VisualDiff[]
+  notifications Notification[]
 
   @@index([projectId])
   @@index([status])
@@ -331,4 +336,74 @@ model VisualDiff {
   @@index([status])
   @@index([testRunId])
   @@index([createdAt])
+}
+
+// ============================================
+// Phase 2: Notifications & Alerts
+// ============================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  type        String   // test_pass, test_fail, test_error, visual_diff, schedule_complete, auto_heal, webhook_received
+  title       String   // Short human-readable title
+  message     String   // Detailed message body
+  status      String   @default("unread") // unread, read, dismissed
+  priority    String   @default("normal") // low, normal, high, critical
+  actionUrl   String?  // URL to navigate when clicking the notification (e.g. /dashboard/projects/xxx)
+  metadata    Json?    // Additional structured data (testRunId, projectId, etc.)
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  testRunId   String?
+  testRun     TestRun? @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@index([projectId])
+}
+
+model NotificationChannel {
+  id          String   @id @default(cuid())
+  type        String   // email, slack, discord, webhook
+  label       String   // User-friendly label, e.g. "Work Slack #testing"
+  config      Json     // Channel-specific config: { email: "a@b.com" }, { webhookUrl: "https://hooks.slack.com/..." }
+  enabled     Boolean  @default(true)
+  verified    Boolean  @default(false) // Whether the channel has been verified (e.g. email confirmed)
+  lastError   String?  // Last delivery error, if any
+  lastSentAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([enabled])
+}
+
+model NotificationPreference {
+  id          String   @id @default(cuid())
+  eventType   String   // test_pass, test_fail, test_error, visual_diff, schedule_complete, auto_heal, webhook_received
+  inApp       Boolean  @default(true)  // Show in-app notification
+  email       Boolean  @default(false) // Send email notification
+  slack       Boolean  @default(false) // Send Slack notification
+  webhook     Boolean  @default(false) // Send to custom webhook
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventType])
+  @@index([userId])
 }

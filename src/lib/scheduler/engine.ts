@@ -13,6 +13,11 @@ import { db } from "@/lib/db";
 import { executeTestRun } from "@/lib/agent/test-executor";
 import { TestAction, sel, actions } from "@/lib/agent/actions";
 import { VERCEL_HOBBY_TIMEOUT } from "@/lib/browser/chromium";
+import {
+  dispatchNotification,
+  buildTestRunNotificationTitle,
+  buildTestRunNotificationMessage,
+} from "@/lib/notifications/dispatcher";
 
 // ── Cron Expression Parser ─────────────────────────────────────────
 
@@ -305,6 +310,7 @@ export async function executeDueSchedules(): Promise<{
     },
     include: {
       project: true,
+      user: { select: { id: true } },
     },
   });
 
@@ -316,7 +322,10 @@ export async function executeDueSchedules(): Promise<{
 
   for (const schedule of dueSchedules) {
     try {
-      const result = await executeSchedule(schedule);
+      const result = await executeSchedule({
+        ...schedule,
+        userId: schedule.user?.id,
+      });
       results.push(result);
 
       if (result.status === "error") {
@@ -377,6 +386,7 @@ export async function executeSchedule(
     preset: string;
     cronExpression: string;
     projectId: string | null;
+    userId?: string;
   }
 ): Promise<ScheduleExecutionResult> {
   const startTime = Date.now();
@@ -455,6 +465,34 @@ export async function executeSchedule(
       `[Scheduler] Schedule "${schedule.name}" completed: ${result.status} in ${duration}ms ` +
       `(${result.summary.passed}/${result.summary.total} passed)`
     );
+
+    // Dispatch notification to schedule owner
+    if (schedule.userId) {
+      try {
+        const notifType = result.status === "passed" ? "schedule_complete" as const
+          : result.status === "failed" ? "test_fail" as const
+          : "test_error" as const;
+        await dispatchNotification({
+          type: notifType,
+          title: buildTestRunNotificationTitle(result.status, schedule.name, "schedule"),
+          message: buildTestRunNotificationMessage(schedule.name, result.status, result.summary, result.duration),
+          userId: schedule.userId,
+          projectId: projectId ?? undefined,
+          testRunId: testRunId ?? undefined,
+          actionUrl: `${process.env.NEXTAUTH_URL || "https://probato-ai.vercel.app"}/dashboard`,
+          priority: result.status === "failed" ? "high" : result.status === "error" ? "high" : "low",
+          metadata: {
+            scheduleId: schedule.id,
+            scheduleName: schedule.name,
+            preset: schedule.preset,
+            url: schedule.url,
+            triggeredBy: "schedule",
+          },
+        });
+      } catch (notifError) {
+        console.error("[Scheduler] Failed to dispatch notification:", notifError);
+      }
+    }
 
     return {
       scheduleId: schedule.id,

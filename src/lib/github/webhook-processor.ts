@@ -14,6 +14,11 @@ import {
 } from "./app";
 import { executeTestRun } from "@/lib/agent/test-executor";
 import { sel, actions, TestAction } from "@/lib/agent/actions";
+import {
+  dispatchNotification,
+  buildTestRunNotificationTitle,
+  buildTestRunNotificationMessage,
+} from "@/lib/notifications/dispatcher";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -425,6 +430,31 @@ async function handlePushEvent(
       } as any).catch(() => {});
     }
 
+    // Dispatch notification to project owner
+    try {
+      const notifType = result.status === "passed" ? "test_pass" as const
+        : result.status === "failed" ? "test_fail" as const
+        : "test_error" as const;
+      await dispatchNotification({
+        type: notifType,
+        title: buildTestRunNotificationTitle(result.status, project.name, `push:${payload.sender?.login || "unknown"}`),
+        message: buildTestRunNotificationMessage(project.name, result.status, result.summary, result.duration),
+        userId: project.userId,
+        projectId: project.id,
+        testRunId: testRun.id,
+        actionUrl: `${process.env.NEXTAUTH_URL || "https://probato-ai.vercel.app"}/dashboard/projects/${project.id}`,
+        priority: result.status === "failed" ? "high" : result.status === "error" ? "critical" : "low",
+        metadata: {
+          commitSha,
+          branch,
+          repoName: repo.full_name,
+          triggeredBy: "push",
+        },
+      });
+    } catch (notifError) {
+      console.error("[Push] Failed to dispatch notification:", notifError);
+    }
+
     return testRun.id;
   } catch (error) {
     // Mark check run as failed
@@ -638,6 +668,32 @@ async function handlePullRequestEvent(
       } catch (error) {
         console.error("[PR] Failed to post comment:", error);
       }
+    }
+
+    // Dispatch notification to project owner
+    try {
+      const notifType = result.status === "passed" ? "test_pass" as const
+        : result.status === "failed" ? "test_fail" as const
+        : "test_error" as const;
+      await dispatchNotification({
+        type: notifType,
+        title: buildTestRunNotificationTitle(result.status, project.name, `pr:${pr.number}:${action}`),
+        message: buildTestRunNotificationMessage(project.name, result.status, result.summary, result.duration),
+        userId: project.userId,
+        projectId: project.id,
+        testRunId: testRun.id,
+        actionUrl: `${process.env.NEXTAUTH_URL || "https://probato-ai.vercel.app"}/dashboard/projects/${project.id}`,
+        priority: result.status === "failed" ? "high" : result.status === "error" ? "critical" : "low",
+        metadata: {
+          prNumber: pr.number,
+          prTitle: pr.title,
+          headSha,
+          repoName: repo.full_name,
+          triggeredBy: "pull_request",
+        },
+      });
+    } catch (notifError) {
+      console.error("[PR] Failed to dispatch notification:", notifError);
     }
 
     return testRun.id;

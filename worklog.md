@@ -247,8 +247,8 @@ PHASE 2 PROGRESS
 ═══════════════════════════════════════════════════════
 M9:  GitHub CI/CD Integration     ✅
 M10: Scheduled & Recurring Tests  ✅
-M11: Visual Regression Testing    🔲
-M12: Notifications & Alerts       🔲
+M11: Visual Regression Testing    ✅
+M12: Notifications & Alerts       ✅
 M13: Billing & Subscription       🔲
 M14: Public API & Developer SDK   🔲
 
@@ -409,3 +409,92 @@ Stage Summary:
 - Dashboard UI with capture form, baseline list, pending diffs, and side-by-side diff viewer
 - 6 new API routes under /api/visual/
 - 2 new Prisma models: VisualBaseline, VisualDiff
+
+---
+Task ID: 12
+Agent: main
+Task: Phase 2 Milestone 12 - Notifications & Alerts
+
+Work Log:
+- Added 3 new Prisma models: Notification, NotificationChannel, NotificationPreference
+  - Notification: type, title, message, status (unread/read/dismissed), priority, actionUrl, metadata, readAt
+  - NotificationChannel: type (email/slack/discord/webhook), label, config (JSON), enabled, verified, lastError, lastSentAt
+  - NotificationPreference: eventType, inApp, email, slack, webhook (unique on userId+eventType)
+  - Added notifications/notificationChannels/notificationPreferences relations to User
+  - Added notifications relation to Project and TestRun
+- Created Notification Dispatcher (src/lib/notifications/dispatcher.ts):
+  - dispatchNotification(): central dispatch engine, creates in-app record then delivers to channels
+  - dispatchToUsers(): batch dispatch to multiple users
+  - ensureUserPreferences(): creates default preferences for all event types
+  - Multi-channel delivery:
+    - In-app: Always stored in DB (if preference allows)
+    - Email: Via Resend API (RESEND_API_KEY env var, optional)
+    - Slack: Via incoming webhook URLs (user-configured, Slack Block Kit formatting)
+    - Discord: Via webhook URLs (user-configured, rich embed formatting)
+    - Custom webhooks: Generic HTTP POST with HMAC-SHA256 signature
+  - Channel-specific validation (email format, Slack/Discord URL patterns)
+  - Default preferences: test_fail and test_error notify via email+Slack by default, others in-app only
+  - Helper functions: buildTestRunNotificationTitle, buildTestRunNotificationMessage, getNotificationTypeDescription
+- Created Notification API routes:
+  - GET /api/notifications — list notifications with pagination, status/type filters, unread count
+  - PATCH /api/notifications — bulk actions (mark_all_read, dismiss_all)
+  - PATCH /api/notifications/[id] — mark individual notification as read/dismissed
+  - DELETE /api/notifications/[id] — delete individual notification
+  - GET /api/notifications/preferences — get user preferences (auto-creates defaults)
+  - PATCH /api/notifications/preferences — update preference per event type
+  - GET /api/notifications/channels — list channels (config data masked for security)
+  - POST /api/notifications/channels — add channel with validation and auto-verification test
+  - PATCH /api/notifications/channels/[id] — update channel (enable/disable, config)
+  - DELETE /api/notifications/channels/[id] — remove channel
+- Channel validation:
+  - Email: regex validation, basic format check
+  - Slack: must start with https://hooks.slack.com/
+  - Discord: must start with https://discord.com/api/webhooks/ or https://discordapp.com/api/webhooks/
+  - Webhook: valid URL format, optional HMAC secret
+  - Max 5 channels per type per user
+- Auto-verification on channel creation: sends test message to verify channel works
+- Config masking: email partial masking, webhook URL truncation, secrets hidden
+- Integrated notifications into existing pipelines:
+  - Webhook processor: sends test_pass/test_fail/test_error on push and PR test runs
+  - Visual compare: sends visual_diff notification when mismatch detected
+  - Scheduler engine: sends schedule_complete/test_fail/test_error after scheduled runs
+  - Auto-heal: sends auto_heal notification with heal results
+- Updated Dashboard UI:
+  - Bell icon in nav bar with unread count badge (red dot with number)
+  - Notification dropdown panel with scrollable list
+  - Notification type icons (CheckCircle2, AlertTriangle, ScanEye, CalendarClock, Zap, Webhook)
+  - Unread highlighting (purple tint background, bold title)
+  - Mark as read on click, dismiss button per notification
+  - "Mark all read" bulk action
+  - Settings gear opens notification preferences
+  - Preference toggles per event type (in-app, email, slack switches)
+  - Channel management: list, enable/disable toggle, delete
+  - Add channel form with type-specific inputs (webhook URL, email address, custom URL+secret)
+  - Auto-refresh unread count on page load
+  - "Unread Alerts" stats card in quick stats (4-column grid now)
+  - Clickable alerts card opens notification panel
+- Added environment variables: RESEND_API_KEY, NOTIFICATION_EMAIL_FROM
+- Added hasResendApiKey and hasBrowserlessToken to health check endpoint
+- Fixed pre-existing bug: ImageDiff → ImageOff import (lucide-react doesn't export ImageDiff)
+- Wrote 39 tests covering:
+  - buildTestRunNotificationTitle: manual, push, PR, schedule, auto-heal triggers, emoji per status
+  - buildTestRunNotificationMessage: passed, failed, error, duration formatting
+  - getNotificationTypeDescription: all 7 event types
+  - Channel validation: email format, Slack/Discord URL patterns, webhook URL, missing config
+  - Default preferences: critical events have more channels, non-critical in-app only
+  - Priority logic: high for failures, critical for errors, low for passes, normal/high for visual diffs
+  - Email template: title inclusion, action button presence
+  - Type coverage: emoji and color for all notification types
+- All 118 tests passing (13 M9 + 38 M10 + 18 M11 + 10 webhook + 39 M12)
+- Prisma client regenerated
+
+Stage Summary:
+- ✅ Milestone 12 COMPLETE — Notifications & Alerts
+- Multi-channel notification system: in-app, email (Resend), Slack, Discord, custom webhooks
+- User-configurable preferences per event type (7 event types)
+- Channel management with auto-verification
+- Notifications dispatched from 4 integration points: webhook processor, visual compare, scheduler, auto-heal
+- Dashboard notification bell with dropdown panel, preferences, and channel management
+- 10 new API routes under /api/notifications/
+- 3 new Prisma models: Notification, NotificationChannel, NotificationPreference
+- Environment variables: RESEND_API_KEY (optional), NOTIFICATION_EMAIL_FROM (optional)

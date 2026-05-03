@@ -12,6 +12,8 @@ export async function GET() {
       hasNextAuthUrl: !!process.env.NEXTAUTH_URL,
       hasGithubId: !!process.env.GITHUB_ID,
       hasGithubSecret: !!process.env.GITHUB_SECRET,
+      hasResendApiKey: !!process.env.RESEND_API_KEY,
+      hasBrowserlessToken: !!process.env.BROWSERLESS_TOKEN,
       nodeEnv: process.env.NODE_ENV,
       vercel: !!process.env.VERCEL,
     },

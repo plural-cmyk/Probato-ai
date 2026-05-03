@@ -42,10 +42,17 @@ import {
   CalendarClock,
   Pause,
   PlayCircle,
-  ImageDiff,
+  ImageOff,
   ThumbsUp,
   ThumbsDown,
   ScanEye,
+  Bell,
+  BellOff,
+  Settings2,
+  Mail,
+  MessageSquare,
+  Hash,
+  Trash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,6 +88,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 
 interface Project {
   id: string;
@@ -387,6 +396,46 @@ export default function DashboardPage() {
     baseline: { id: string; name: string; url: string; screenshot: string };
   } | null>(null);
 
+  // Notification state
+  const [notifications, setNotifications] = useState<{
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    status: string;
+    priority: string;
+    actionUrl: string | null;
+    readAt: string | null;
+    createdAt: string;
+    project: { id: string; name: string } | null;
+    testRun: { id: string; status: string; triggeredBy: string } | null;
+  }[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [notifPrefs, setNotifPrefs] = useState<{
+    eventType: string;
+    inApp: boolean;
+    email: boolean;
+    slack: boolean;
+    webhook: boolean;
+  }[]>([]);
+  const [notifChannels, setNotifChannels] = useState<{
+    id: string;
+    type: string;
+    label: string;
+    config: Record<string, string>;
+    enabled: boolean;
+    verified: boolean;
+    lastError: string | null;
+    lastSentAt: string | null;
+  }[]>([]);
+  const [newChannelType, setNewChannelType] = useState("slack");
+  const [newChannelLabel, setNewChannelLabel] = useState("");
+  const [newChannelConfig, setNewChannelConfig] = useState<Record<string, string>>({});
+  const [addingChannel, setAddingChannel] = useState(false);
+  const [showNotifSettings, setShowNotifSettings] = useState(false);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/signin");
@@ -415,6 +464,11 @@ export default function DashboardPage() {
         .then((res) => res.json())
         .then((data) => setBrowserStatus(data))
         .catch(() => setBrowserStatus({ available: false, mode: "unavailable", error: "Failed to check" }));
+      // Load notification unread count
+      fetch("/api/notifications?limit=1")
+        .then((res) => res.json())
+        .then((data) => setUnreadCount(data.unreadCount ?? 0))
+        .catch(() => {});
     }
   }, [status, fetchProjects]);
 
@@ -985,6 +1039,150 @@ export default function DashboardPage() {
     }
   }
 
+  // ── Notification functions ──────────────────────────────────────
+
+  async function loadNotifications() {
+    setNotifLoading(true);
+    try {
+      const res = await fetch("/api/notifications?limit=20");
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications ?? []);
+        setUnreadCount(data.unreadCount ?? 0);
+      }
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+    } finally {
+      setNotifLoading(false);
+    }
+  }
+
+  async function markNotificationRead(notifId: string) {
+    try {
+      await fetch(`/api/notifications/${notifId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "read" }),
+      });
+      await loadNotifications();
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+    }
+  }
+
+  async function dismissNotification(notifId: string) {
+    try {
+      await fetch(`/api/notifications/${notifId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "dismissed" }),
+      });
+      await loadNotifications();
+    } catch (error) {
+      console.error("Failed to dismiss notification:", error);
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_all_read" }),
+      });
+      await loadNotifications();
+    } catch (error) {
+      console.error("Failed to mark all as read:", error);
+    }
+  }
+
+  async function loadNotifPrefs() {
+    try {
+      const res = await fetch("/api/notifications/preferences");
+      if (res.ok) {
+        const data = await res.json();
+        setNotifPrefs(data.preferences ?? []);
+      }
+    } catch (error) {
+      console.error("Failed to load notification preferences:", error);
+    }
+  }
+
+  async function updateNotifPref(eventType: string, field: "inApp" | "email" | "slack" | "webhook", value: boolean) {
+    try {
+      await fetch("/api/notifications/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventType, [field]: value }),
+      });
+      await loadNotifPrefs();
+    } catch (error) {
+      console.error("Failed to update notification preference:", error);
+    }
+  }
+
+  async function loadNotifChannels() {
+    try {
+      const res = await fetch("/api/notifications/channels");
+      if (res.ok) {
+        const data = await res.json();
+        setNotifChannels(data.channels ?? []);
+      }
+    } catch (error) {
+      console.error("Failed to load notification channels:", error);
+    }
+  }
+
+  async function addNotifChannel() {
+    if (!newChannelLabel.trim()) return;
+    setAddingChannel(true);
+    try {
+      const res = await fetch("/api/notifications/channels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: newChannelType,
+          label: newChannelLabel.trim(),
+          config: newChannelConfig,
+        }),
+      });
+      if (res.ok) {
+        setNewChannelLabel("");
+        setNewChannelConfig({});
+        await loadNotifChannels();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to add channel");
+      }
+    } catch (error) {
+      console.error("Failed to add notification channel:", error);
+    } finally {
+      setAddingChannel(false);
+    }
+  }
+
+  async function deleteNotifChannel(channelId: string) {
+    try {
+      await fetch(`/api/notifications/channels/${channelId}`, { method: "DELETE" });
+      await loadNotifChannels();
+    } catch (error) {
+      console.error("Failed to delete notification channel:", error);
+    }
+  }
+
+  async function toggleChannelEnabled(channelId: string, enabled: boolean) {
+    try {
+      await fetch(`/api/notifications/channels/${channelId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      await loadNotifChannels();
+    } catch (error) {
+      console.error("Failed to toggle channel:", error);
+    }
+  }
+
   if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -1025,6 +1223,284 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Notification Bell */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative"
+                onClick={() => {
+                  setShowNotifPanel(!showNotifPanel);
+                  if (!showNotifPanel) loadNotifications();
+                }}
+              >
+                {unreadCount > 0 ? (
+                  <Bell className="h-5 w-5 text-deep-indigo" />
+                ) : (
+                  <BellOff className="h-5 w-5 text-muted-foreground" />
+                )}
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-warm-red text-[10px] font-bold text-white">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Button>
+
+              {/* Notification Dropdown Panel */}
+              {showNotifPanel && (
+                <div className="absolute right-0 top-12 z-50 w-96 max-h-[500px] overflow-hidden rounded-lg border bg-white shadow-xl">
+                  <div className="flex items-center justify-between p-3 border-b bg-zinc-50">
+                    <span className="text-sm font-semibold">Notifications</span>
+                    <div className="flex items-center gap-1">
+                      {unreadCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-7 px-2"
+                          onClick={markAllNotificationsRead}
+                        >
+                          Mark all read
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          setShowNotifSettings(!showNotifSettings);
+                          if (!showNotifSettings) {
+                            loadNotifPrefs();
+                            loadNotifChannels();
+                          }
+                        }}
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {showNotifSettings ? (
+                    /* Notification Settings */
+                    <div className="max-h-[420px] overflow-y-auto p-3 space-y-4">
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2">Notification Preferences</h4>
+                        <div className="space-y-2">
+                          {notifPrefs.map((pref) => (
+                            <div key={pref.eventType} className="flex items-center justify-between py-1">
+                              <span className="text-xs capitalize">{pref.eventType.replace(/_/g, " ")}</span>
+                              <div className="flex items-center gap-2">
+                                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <Switch
+                                    checked={pref.inApp}
+                                    onCheckedChange={(v) => updateNotifPref(pref.eventType, "inApp", v)}
+                                    className="scale-75"
+                                  />
+                                  App
+                                </label>
+                                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <Switch
+                                    checked={pref.email}
+                                    onCheckedChange={(v) => updateNotifPref(pref.eventType, "email", v)}
+                                    className="scale-75"
+                                  />
+                                  Email
+                                </label>
+                                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <Switch
+                                    checked={pref.slack}
+                                    onCheckedChange={(v) => updateNotifPref(pref.eventType, "slack", v)}
+                                    className="scale-75"
+                                  />
+                                  Slack
+                                </label>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2">Channels</h4>
+                        {notifChannels.length === 0 && (
+                          <p className="text-xs text-muted-foreground mb-2">No channels configured. Add one below.</p>
+                        )}
+                        {notifChannels.map((ch) => (
+                          <div key={ch.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                            <div className="flex items-center gap-2">
+                              {ch.type === "email" && <Mail className="h-3.5 w-3.5 text-muted-foreground" />}
+                              {ch.type === "slack" && <Hash className="h-3.5 w-3.5 text-[#4A154B]" />}
+                              {ch.type === "discord" && <MessageSquare className="h-3.5 w-3.5 text-[#5865F2]" />}
+                              {ch.type === "webhook" && <Link2 className="h-3.5 w-3.5 text-muted-foreground" />}
+                              <div>
+                                <span className="text-xs font-medium">{ch.label}</span>
+                                {!ch.verified && ch.enabled && (
+                                  <span className="ml-1 text-[10px] text-amber">(unverified)</span>
+                                )}
+                                {ch.lastError && (
+                                  <p className="text-[10px] text-warm-red">{ch.lastError}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Switch
+                                checked={ch.enabled}
+                                onCheckedChange={() => toggleChannelEnabled(ch.id, ch.enabled)}
+                                className="scale-75"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => deleteNotifChannel(ch.id)}
+                              >
+                                <Trash className="h-3 w-3 text-warm-red" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <Separator />
+
+                      {/* Add Channel */}
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2">Add Channel</h4>
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <Select value={newChannelType} onValueChange={(v) => { setNewChannelType(v); setNewChannelConfig({}); }}>
+                              <SelectTrigger className="w-28 h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="slack">Slack</SelectItem>
+                                <SelectItem value="discord">Discord</SelectItem>
+                                <SelectItem value="email">Email</SelectItem>
+                                <SelectItem value="webhook">Webhook</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              placeholder="Label (e.g. 'Team Slack')"
+                              value={newChannelLabel}
+                              onChange={(e) => setNewChannelLabel(e.target.value)}
+                              className="h-8 text-xs flex-1"
+                            />
+                          </div>
+                          {(newChannelType === "slack" || newChannelType === "discord") && (
+                            <Input
+                              placeholder="Webhook URL"
+                              value={newChannelConfig.webhookUrl || ""}
+                              onChange={(e) => setNewChannelConfig({ ...newChannelConfig, webhookUrl: e.target.value })}
+                              className="h-8 text-xs font-mono"
+                            />
+                          )}
+                          {newChannelType === "email" && (
+                            <Input
+                              placeholder="Email address"
+                              type="email"
+                              value={newChannelConfig.email || ""}
+                              onChange={(e) => setNewChannelConfig({ ...newChannelConfig, email: e.target.value })}
+                              className="h-8 text-xs"
+                            />
+                          )}
+                          {newChannelType === "webhook" && (
+                            <>
+                              <Input
+                                placeholder="Webhook URL"
+                                value={newChannelConfig.url || ""}
+                                onChange={(e) => setNewChannelConfig({ ...newChannelConfig, url: e.target.value })}
+                                className="h-8 text-xs font-mono"
+                              />
+                              <Input
+                                placeholder="Secret (optional, for HMAC signing)"
+                                value={newChannelConfig.secret || ""}
+                                onChange={(e) => setNewChannelConfig({ ...newChannelConfig, secret: e.target.value })}
+                                className="h-8 text-xs"
+                              />
+                            </>
+                          )}
+                          <Button
+                            size="sm"
+                            className="w-full h-8 text-xs bg-electric-violet hover:bg-electric-violet/90 text-white"
+                            onClick={addNotifChannel}
+                            disabled={addingChannel || !newChannelLabel.trim()}
+                          >
+                            {addingChannel ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                            {addingChannel ? "Adding..." : "Add Channel"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Notification List */
+                    <div className="max-h-[420px] overflow-y-auto">
+                      {notifLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="flex flex-col items-center py-8 text-muted-foreground">
+                          <Bell className="h-8 w-8 mb-2 opacity-30" />
+                          <p className="text-sm">No notifications yet</p>
+                          <p className="text-xs">Test results and alerts will appear here</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div
+                            key={notif.id}
+                            className={`flex items-start gap-3 p-3 border-b cursor-pointer hover:bg-zinc-50 transition-colors ${
+                              notif.status === "unread" ? "bg-electric-violet/5" : ""
+                            }`}
+                            onClick={() => {
+                              if (notif.status === "unread") markNotificationRead(notif.id);
+                            }}
+                          >
+                            <div className="mt-0.5">
+                              {notif.type === "test_pass" && <CheckCircle2 className="h-4 w-4 text-emerald" />}
+                              {notif.type === "test_fail" && <AlertTriangle className="h-4 w-4 text-warm-red" />}
+                              {notif.type === "test_error" && <AlertTriangle className="h-4 w-4 text-amber" />}
+                              {notif.type === "visual_diff" && <ScanEye className="h-4 w-4 text-electric-violet" />}
+                              {notif.type === "schedule_complete" && <CalendarClock className="h-4 w-4 text-blue-500" />}
+                              {notif.type === "auto_heal" && <Zap className="h-4 w-4 text-purple-500" />}
+                              {notif.type === "webhook_received" && <Webhook className="h-4 w-4 text-muted-foreground" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm ${notif.status === "unread" ? "font-semibold" : "font-medium"}`}>
+                                {notif.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-muted-foreground">
+                                  {new Date(notif.createdAt).toLocaleString()}
+                                </span>
+                                {notif.project && (
+                                  <Badge variant="secondary" className="text-[10px] h-4">
+                                    {notif.project.name}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                dismissNotification(notif.id);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2 px-2">
@@ -1119,7 +1595,7 @@ export default function DashboardPage() {
         )}
 
         {/* Quick Stats */}
-        <div className="mb-8 grid gap-4 sm:grid-cols-3">
+        <div className="mb-8 grid gap-4 sm:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Total Projects</CardDescription>
@@ -1140,6 +1616,18 @@ export default function DashboardPage() {
               <CardTitle className="text-3xl text-warm-red">
                 {projects.filter((p) => p.status === "error").length}
               </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card
+            className={`cursor-pointer transition-colors ${unreadCount > 0 ? "border-electric-violet/30 hover:bg-electric-violet/5" : ""}`}
+            onClick={() => {
+              setShowNotifPanel(true);
+              loadNotifications();
+            }}
+          >
+            <CardHeader className="pb-2">
+              <CardDescription>Unread Alerts</CardDescription>
+              <CardTitle className="text-3xl text-electric-violet">{unreadCount}</CardTitle>
             </CardHeader>
           </Card>
         </div>
@@ -2633,7 +3121,7 @@ export default function DashboardPage() {
                       <div key={baseline.id} className="rounded-lg border p-3 space-y-1">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <ImageDiff className="h-4 w-4 text-muted-foreground" />
+                            <ImageOff className="h-4 w-4 text-muted-foreground" />
                             <span className="text-sm font-medium">{baseline.name}</span>
                             {baseline.approvedAt && (
                               <Badge variant="outline" className="text-xs bg-emerald/10 text-emerald border-emerald/20">
@@ -2740,7 +3228,7 @@ export default function DashboardPage() {
                 <div className="space-y-3 rounded-lg border border-rose-200 bg-rose-50/50 p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <ImageDiff className="h-5 w-5 text-rose-500" />
+                      <ImageOff className="h-5 w-5 text-rose-500" />
                       <span className="text-sm font-semibold">Visual Diff: {diffDetail.baseline.name}</span>
                       <Badge variant="outline" className="text-xs bg-warm-red/10 text-warm-red border-warm-red/20">
                         {diffDetail.mismatchPercent.toFixed(2)}% mismatch

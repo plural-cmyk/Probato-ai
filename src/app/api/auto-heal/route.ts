@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { autoHealTestRun } from "@/lib/agent/auto-heal";
 import { db } from "@/lib/db";
+import { dispatchNotification } from "@/lib/notifications/dispatcher";
 
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
@@ -74,6 +75,31 @@ export async function POST(request: NextRequest) {
     const report = await autoHealTestRun(testRunId, targetUrl, failedSteps);
 
     console.log(`[Auto-Heal] Completed: ${report.totalHealed} healed, ${report.totalFailed} failed in ${report.duration}ms`);
+
+    // Dispatch auto-heal notification
+    try {
+      await dispatchNotification({
+        type: "auto_heal",
+        title: report.totalHealed > 0
+          ? `🩹 Auto-heal: ${report.totalHealed} test(s) repaired`
+          : `⚠️ Auto-heal: No tests could be repaired`,
+        message: report.totalHealed > 0
+          ? `Auto-heal successfully repaired ${report.totalHealed} of ${report.totalHealed + report.totalFailed} failed tests in ${(report.duration / 1000).toFixed(1)}s.`
+          : `Auto-heal could not repair any of the ${report.totalFailed} failed tests. Manual intervention may be required.`,
+        userId: session.user.id,
+        projectId: testRun.projectId,
+        testRunId: testRun.id,
+        actionUrl: `${process.env.NEXTAUTH_URL || "https://probato-ai.vercel.app"}/dashboard`,
+        priority: report.totalHealed > 0 ? "low" : "normal",
+        metadata: {
+          totalHealed: report.totalHealed,
+          totalFailed: report.totalFailed,
+          duration: report.duration,
+        },
+      });
+    } catch (notifError) {
+      console.error("[Auto-Heal] Failed to dispatch notification:", notifError);
+    }
 
     return NextResponse.json({
       healed: report.totalHealed > 0,

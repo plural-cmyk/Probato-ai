@@ -16,6 +16,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { compareScreenshots, captureForVisualRegression, createCompositeDiff } from "@/lib/visual/compare";
+import { dispatchNotification } from "@/lib/notifications/dispatcher";
 
 export async function POST(request: NextRequest) {
   try {
@@ -105,6 +106,31 @@ export async function POST(request: NextRequest) {
           testRunId: testRunId ?? null,
         },
       });
+
+      // Dispatch notification if visual difference detected
+      if (!result.match && diffRecord) {
+        try {
+          await dispatchNotification({
+            type: "visual_diff",
+            title: `👁️ Visual diff detected: ${baseline.name}`,
+            message: `Baseline "${baseline.name}" on ${baseline.url} shows ${result.mismatchPercent.toFixed(2)}% visual difference. ${result.mismatchPixels} of ${result.totalPixels} pixels changed.`,
+            userId: session.user.id,
+            projectId: baseline.projectId,
+            testRunId: testRunId ?? undefined,
+            actionUrl: `${process.env.NEXTAUTH_URL || "https://probato-ai.vercel.app"}/dashboard`,
+            priority: result.mismatchPercent > 5 ? "high" : "normal",
+            metadata: {
+              baselineId: baseline.id,
+              baselineName: baseline.name,
+              diffId: diffRecord.id,
+              mismatchPercent: result.mismatchPercent,
+              mismatchPixels: result.mismatchPixels,
+            },
+          });
+        } catch (notifError) {
+          console.error("[Visual Compare] Failed to dispatch notification:", notifError);
+        }
+      }
     }
 
     return NextResponse.json({
