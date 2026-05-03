@@ -8,7 +8,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  directUrl = env("DATABASE_URL")
 }
 
 // ============================================
@@ -162,4 +162,69 @@ model TestCase {
   feature   Feature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
 
   @@index([featureId])
+}
+
+// ============================================
+// Phase 2: CI/CD Integration Models
+// ============================================
+
+model Installation {
+  id                String   @id @default(cuid())
+  githubInstallationId Int   @unique // GitHub App installation ID
+  accountId         Int?     // GitHub account (org/user) ID
+  accountLogin      String?  // GitHub account login
+  accountType       String?  // "User" or "Organization"
+  accessToken       String?  // Installation access token (encrypted)
+  tokenExpiresAt    DateTime?
+  repositorySelection String? @default("selected") // "all" or "selected"
+  status            String   @default("active") // active, suspended, deleted
+  installedAt       DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  webhookEvents WebhookEvent[]
+  repositories  Repository[]
+
+  @@index([githubInstallationId])
+  @@index([status])
+}
+
+model Repository {
+  id              String   @id @default(cuid())
+  githubRepoId    Int      @unique // GitHub repository ID
+  name            String   // e.g. "plural-cmyk/Probato-ai"
+  fullName        String   // e.g. "Probato-ai"
+  private         Boolean  @default(false)
+  defaultBranch   String   @default("main")
+  htmlUrl         String?
+  projectId       String?  // Link to Probato project
+  enabled         Boolean  @default(true) // User can disable per-repo
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  installationId  String
+  installation    Installation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  @@index([installationId])
+  @@index([githubRepoId])
+}
+
+model WebhookEvent {
+  id                String   @id @default(cuid())
+  githubDeliveryId  String?  // X-GitHub-Delivery header
+  event             String   // push, pull_request, installation, etc.
+  action            String?  // opened, synchronize, closed, etc.
+  payload           Json     // Full webhook payload
+  processed         Boolean  @default(false)
+  processingError   String?  // Error if processing failed
+  triggeredTestRunId String? // Link to the test run triggered by this event
+  createdAt         DateTime @default(now())
+  processedAt       DateTime?
+
+  installationId String?
+  installation   Installation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
+
+  @@index([event])
+  @@index([processed])
+  @@index([installationId])
+  @@index([createdAt])
 }

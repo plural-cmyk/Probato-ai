@@ -36,6 +36,9 @@ import {
   Sparkles,
   FileSearch,
   ListChecks,
+  Webhook,
+  GitBranch,
+  ToggleLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -288,6 +291,30 @@ export default function DashboardPage() {
     maxDepth: number;
     cycleCount: number;
   } | null>(null);
+
+  // CI/CD Integration state
+  const [ciData, setCiData] = useState<{
+    installations: {
+      id: string;
+      githubInstallationId: number;
+      accountLogin: string | null;
+      accountType: string | null;
+      status: string;
+      repositoryCount?: number;
+      repositories?: { id: string; name: string; enabled: boolean; projectId: string | null; defaultBranch: string; private: boolean }[];
+    }[];
+    recentEvents: {
+      id: string;
+      event: string;
+      action: string | null;
+      processed: boolean;
+      processingError: string | null;
+      triggeredTestRunId: string | null;
+      createdAt: string;
+    }[];
+    syncedFromGitHub: boolean;
+  } | null>(null);
+  const [ciLoading, setCiLoading] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -671,6 +698,35 @@ export default function DashboardPage() {
       }
     } catch {
       // Ignore
+    }
+  }
+
+  async function loadCiData() {
+    setCiLoading(true);
+    try {
+      const res = await fetch("/api/installations?includeRepos=true");
+      if (res.ok) {
+        const data = await res.json();
+        setCiData(data);
+      }
+    } catch (error) {
+      console.error("Failed to load CI/CD data:", error);
+    } finally {
+      setCiLoading(false);
+    }
+  }
+
+  async function toggleRepoEnabled(repositoryId: string, enabled: boolean) {
+    try {
+      await fetch("/api/installations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repositoryId, enabled: !enabled }),
+      });
+      // Reload CI data
+      await loadCiData();
+    } catch (error) {
+      console.error("Failed to toggle repo:", error);
     }
   }
 
@@ -1894,6 +1950,152 @@ export default function DashboardPage() {
             })}
           </div>
         )}
+
+        {/* CI/CD Integration Section */}
+        <Card className="mb-8 border-border/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber/10">
+                  <Webhook className="h-4 w-4 text-amber" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">CI/CD Integration</CardTitle>
+                  <CardDescription className="text-xs">
+                    GitHub App — auto-trigger tests on push and pull requests
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={loadCiData}
+                disabled={ciLoading}
+              >
+                {ciLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {ciData ? (
+              <div className="space-y-4">
+                {/* Installations */}
+                {ciData.installations.length > 0 ? (
+                  <div className="space-y-3">
+                    {ciData.installations.map((inst) => (
+                      <div key={inst.id} className="rounded-lg border p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Github className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">{inst.accountLogin || `Installation #${inst.githubInstallationId}`}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {inst.accountType || "User"}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              inst.status === "active"
+                                ? "bg-emerald/10 text-emerald border-emerald/20"
+                                : inst.status === "suspended"
+                                ? "bg-amber/10 text-amber border-amber/20"
+                                : "bg-zinc-100 text-zinc-500"
+                            }`}
+                          >
+                            {inst.status}
+                          </Badge>
+                        </div>
+
+                        {/* Repositories */}
+                        {inst.repositories && inst.repositories.length > 0 && (
+                          <div className="pl-6 space-y-1">
+                            {inst.repositories.map((repo) => (
+                              <div key={repo.id} className="flex items-center gap-2 text-xs">
+                                <GitBranch className="h-3 w-3 text-muted-foreground" />
+                                <span className="font-mono">{repo.name}</span>
+                                {repo.private && (
+                                  <Badge variant="secondary" className="text-[10px] px-1">private</Badge>
+                                )}
+                                <span className="text-muted-foreground">{repo.defaultBranch}</span>
+                                <button
+                                  onClick={() => toggleRepoEnabled(repo.id, repo.enabled)}
+                                  className="ml-auto"
+                                  title={repo.enabled ? "Disable CI/CD" : "Enable CI/CD"}
+                                >
+                                  <ToggleLeft
+                                    className={`h-4 w-4 ${
+                                      repo.enabled ? "text-emerald" : "text-zinc-300"
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 space-y-3">
+                    <Webhook className="h-8 w-8 text-muted-foreground mx-auto" />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">No GitHub App installations yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Install the Probato GitHub App on your repositories to enable automatic test runs on push and PR events.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Webhook Events */}
+                {ciData.recentEvents.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-deep-indigo mb-2 flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      Recent Events
+                    </h4>
+                    <div className="space-y-1">
+                      {ciData.recentEvents.slice(0, 10).map((event) => (
+                        <div key={event.id} className="flex items-center gap-2 text-xs py-1">
+                          {event.processed ? (
+                            <CheckCircle2 className="h-3 w-3 text-emerald shrink-0" />
+                          ) : (
+                            <Loader2 className="h-3 w-3 animate-spin text-amber shrink-0" />
+                          )}
+                          <Badge variant="outline" className="text-[10px] shrink-0">
+                            {event.event}
+                          </Badge>
+                          {event.action && (
+                            <span className="text-muted-foreground">{event.action}</span>
+                          )}
+                          {event.processingError && (
+                            <span className="text-warm-red truncate">{event.processingError}</span>
+                          )}
+                          {event.triggeredTestRunId && (
+                            <Badge variant="secondary" className="text-[10px] ml-auto">
+                              test triggered
+                            </Badge>
+                          )}
+                          <span className="text-muted-foreground ml-auto shrink-0">
+                            {new Date(event.createdAt).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground">
+                  Click refresh to load CI/CD integration status
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
 
       {/* Sandbox Status Drawer */}
