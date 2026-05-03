@@ -498,3 +498,122 @@ Stage Summary:
 - 10 new API routes under /api/notifications/
 - 3 new Prisma models: Notification, NotificationChannel, NotificationPreference
 - Environment variables: RESEND_API_KEY (optional), NOTIFICATION_EMAIL_FROM (optional)
+
+---
+Task ID: 13
+Agent: main
+Task: Phase 2 Milestone 13 - Billing & Subscription
+
+Work Log:
+- Added 3 new Prisma models: Subscription, CreditBalance, CreditTransaction
+  - Subscription: plan (free/pro/team/enterprise), status, billing period, gateway refs (Stripe + Paystack), cancelAtPeriodEnd
+  - CreditBalance: balance, monthlyAllowance, rolloverBalance, purchasedBalance, totalUsed, totalReceived, autoRecharge settings, lastMonthlyReset
+  - CreditTransaction: type (credit/debit/reservation/settlement/release/expiry), amount, balanceAfter, action, description, referenceId/Type, gatewayPaymentId, reservationStatus, metadata
+  - Added subscription/creditBalance/creditTransactions relations to User model
+  - Unique constraints on userId for Subscription and CreditBalance
+  - Stripe and Paystack reference fields on Subscription (stripeCustomerId, stripeSubscriptionId, stripePriceId, paystackCustomerId, paystackSubscriptionCode, paystackPlanCode)
+- Created Plan Definitions (src/lib/billing/plans.ts):
+  - 4 plans: Free ($0, 20 credits), Pro ($29, 200 credits), Team ($79, 750 credits), Enterprise (custom)
+  - 6 credit costs: test_generation (5), test_execution (2/min), feature_discovery (6), visual_compare (3), auto_heal (8), screenshot_storage (1/GB)
+  - 3 credit packs: 100/$10, 500/$40 (20% off), 2000/$120 (40% off)
+  - KES prices for African markets: Pro KES 3,750, Team KES 10,200
+  - Feature gating: autoHeal/visualRegression require Pro+, priorityExecution requires Team+
+  - Project limits: Free 1, Pro 5, Team unlimited
+  - Rollover: Free no rollover, Pro/Team up to 1x monthly allowance
+  - Helper functions: isFeatureAvailable, isProjectLimitReached, isScheduleLimitReached
+- Created Payment Gateway Abstraction (src/lib/billing/gateway.ts):
+  - PaymentGateway interface with unified API across all gateways
+  - MockGateway: fully functional for development, simulates successful payments, no real API calls
+  - StripeGateway: full Stripe Checkout, Customer Portal, subscription management, auto-recharge (dynamic import)
+  - PaystackGateway: M-Pesa/KES support, Paystack API integration, webhook signature verification
+  - Gateway factory: selects gateway via PAYMENT_GATEWAY env var (mock/stripe/paystack)
+  - Seamless switching: change env var → switch gateway, no code changes
+- Created Credit Metering Service (src/lib/billing/credits.ts):
+  - ensureUserBilling(): auto-creates Subscription + CreditBalance on first access
+  - checkCredits(): verify balance before action, returns lowBalance flag
+  - deductCredits(): instant deduction for generation, discovery, visual compare, auto-heal
+  - reserveCredits(): reservation for timed actions (test execution), estimated minutes
+  - settleCredits(): finalize reservation based on actual usage, return unused credits
+  - releaseCredits(): cancel reservation and return all credits
+  - addCredits(): add credits from monthly reset, packs, auto-recharge, promos
+  - resetMonthlyCredits(): monthly credit reset with rollover logic (Free: no rollover, Pro/Team: up to 1x)
+  - triggerAutoRecharge(): automatically add credits when balance hits threshold
+  - updatePlanCredits(): adjust credits on plan change (upgrade grants difference immediately)
+  - updateAutoRechargeSettings(): user-configurable auto-recharge preferences
+- Created Subscription Management Service (src/lib/billing/subscription.ts):
+  - getSubscriptionInfo(): current plan, status, billing period
+  - activateSubscription(): create/activate after successful payment (stores gateway refs)
+  - changeSubscription(): upgrade (immediate) or downgrade (end of period)
+  - cancelSubscription(): soft cancel (end of period) or immediate revert to Free
+  - checkFeatureAccess(): plan-gated feature verification (autoHeal, visualRegression, priorityExecution)
+  - checkProjectLimit(): verify user can create more projects
+  - checkScheduleLimit(): verify user can create more schedules
+  - getBillingSummary(): full billing state for dashboard (plan, credits, transactions)
+- Created Billing API routes (5 endpoints):
+  - GET /api/billing — plans, current plan, credits, credit costs, credit packs, transactions
+  - POST /api/billing/checkout — create checkout session (subscription or credit pack)
+  - POST /api/billing/portal — create customer portal session (Stripe)
+  - GET/POST/PATCH /api/billing/subscription — get, activate, change, cancel subscription
+  - GET/POST /api/billing/credits — balance, history, check/deduct/reserve/settle/purchase_pack/update_auto_recharge
+  - POST /api/billing/webhook — handles Stripe and Paystack webhook events
+- Integrated credit checks into existing action routes:
+  - POST /api/discover — checkCredits + deductCredits before feature discovery (6 credits)
+  - POST /api/generate — checkCredits + deductCredits before test generation (5 credits)
+  - POST /api/auto-heal — checkFeatureAccess(autoHeal) + checkCredits + deductCredits (8 credits, Pro+ only)
+  - POST /api/visual/compare — checkFeatureAccess(visualRegression) + checkCredits + deductCredits (3 credits, Pro+ only)
+  - Returns 402 with creditsRequired/creditsBalance when insufficient
+  - Returns 403 with requiredPlan when feature not available on current plan
+- Updated Dashboard with Billing UI:
+  - CreditCard icon button in nav bar
+  - Credit balance badge in nav bar showing remaining credits
+  - Billing dialog modal with sections:
+    - Current Plan summary card with credits remaining, monthly/purchased/used breakdown
+    - Low balance warning (amber alert when < 20% of monthly allowance)
+    - Plan cards grid (Free/Pro/Team) with pricing, features, upgrade buttons
+    - Credit packs section with buy buttons and discount badges
+    - Auto-recharge toggle switch
+    - Credit cost reference table
+    - Recent activity transactions list (color-coded +green/-red)
+    - Cancel subscription button (paid plans only)
+  - Mock gateway checkout: simulates successful payment, activates plan immediately
+  - Real gateway checkout: redirects to Stripe/Paystack hosted checkout
+- Wrote 61 tests covering:
+  - Plan Definitions: all 4 plans, ascending prices/credits, feature gating, KES prices, rollover
+  - Plan Helpers: getPlan, getPlanList, isFeatureAvailable, isProjectLimitReached, isScheduleLimitReached
+  - Credit Costs: all 6 actions, correct values, units, descriptions, positive estimated costs
+  - Credit Packs: 3 packs, ascending amounts, increasing discounts, decreasing price/credit, KES prices
+  - Auto-Recharge Defaults: sensible default values
+  - MockGateway: isConfigured, type, checkout session (subscription + credit pack), portal, update, cancel, purchase, auto-recharge, invalid pack, webhook parsing
+  - Credit Calculation Scenarios: free user capacities (~3 discoveries, ~4 generations), pro user capacities (40 generations, 100 min execution), team user capacities, auto-heal most expensive
+  - Revenue & Margin Analysis: price per credit per plan, credit pack pricing, margin calculations (~55-60%)
+  - Plan Upgrade Path: credit differences, feature unlocks
+- All 179 tests passing (61 M13 + 118 previous)
+- Prisma client regenerated
+- Created src/lib/billing/index.ts barrel export
+
+Stage Summary:
+- ✅ Milestone 13 COMPLETE — Billing & Subscription
+- Hybrid billing model: subscription (monthly credits) + prepaid credits
+- 4 plans: Free ($0/20cr), Pro ($29/200cr), Team ($79/750cr), Enterprise (custom)
+- 6 credit-metered actions with transparent per-action pricing
+- Payment gateway abstraction: Mock (dev), Stripe (global), Paystack (Africa/M-Pesa)
+- Credit lifecycle: check → deduct/reserve → settle/release
+- Auto-recharge with user-configurable threshold and amount
+- Monthly credit reset with rollover logic
+- Plan-gated features: autoHeal and visualRegression require Pro+, priorityExecution requires Team+
+- Existing routes now enforce credit checks and feature gates
+- Dashboard billing dialog with plan selection, credit packs, auto-recharge, and transaction history
+- Ready for Stripe/Paystack: set PAYMENT_GATEWAY=stripe, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+- Ready for M-Pesa: set PAYMENT_GATEWAY=paystack, PAYSTACK_SECRET_KEY
+- 3 new Prisma models: Subscription, CreditBalance, CreditTransaction
+- 5 new API routes under /api/billing/
+
+═══════════════════════════════════════════════════════
+PHASE 2 PROGRESS
+═══════════════════════════════════════════════════════
+M9:  GitHub CI/CD Integration     ✅
+M10: Scheduled & Recurring Tests  ✅
+M11: Visual Regression Testing    ✅
+M12: Notifications & Alerts       ✅
+M13: Billing & Subscription       ✅
+M14: Public API & Developer SDK   🔲

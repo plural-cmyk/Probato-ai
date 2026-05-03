@@ -17,6 +17,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { compareScreenshots, captureForVisualRegression, createCompositeDiff } from "@/lib/visual/compare";
 import { dispatchNotification } from "@/lib/notifications/dispatcher";
+import { checkCredits, deductCredits } from "@/lib/billing/credits";
+import { checkFeatureAccess } from "@/lib/billing/subscription";
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,6 +43,37 @@ export async function POST(request: NextRequest) {
         { error: "baselineId is required" },
         { status: 400 }
       );
+    }
+
+    // ── Plan feature check (visual regression requires Pro+) ──
+    const featureAccess = await checkFeatureAccess(session.user.id, "visualRegression");
+    if (!featureAccess.allowed) {
+      return NextResponse.json({
+        error: "Feature not available",
+        details: featureAccess.reason ?? "Visual regression requires the Pro plan or higher",
+        requiredPlan: featureAccess.requiredPlan,
+      }, { status: 403 });
+    }
+
+    // ── Credit check & deduction ──
+    const creditCheck = await checkCredits(session.user.id, "visual_compare");
+    if (!creditCheck.hasCredits) {
+      return NextResponse.json({
+        error: "Insufficient credits",
+        details: `Visual comparison requires ${creditCheck.required} credits. You have ${creditCheck.balance}.`,
+        creditsRequired: creditCheck.required,
+        creditsBalance: creditCheck.balance,
+      }, { status: 402 });
+    }
+    const creditDeduction = await deductCredits(
+      session.user.id,
+      "visual_compare",
+      `Visual regression comparison for baseline ${baselineId}`,
+      baselineId,
+      "visual_baseline"
+    );
+    if (!creditDeduction.success) {
+      return NextResponse.json({ error: "Credit deduction failed", details: "Could not deduct credits for visual comparison" }, { status: 402 });
     }
 
     // Fetch the baseline

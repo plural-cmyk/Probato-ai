@@ -74,6 +74,9 @@ model User {
   notifications          Notification[]
   notificationChannels   NotificationChannel[]
   notificationPreferences NotificationPreference[]
+  subscription           Subscription?
+  creditBalance          CreditBalance?
+  creditTransactions     CreditTransaction[]
 }
 
 model Project {
@@ -406,4 +409,98 @@ model NotificationPreference {
 
   @@unique([userId, eventType])
   @@index([userId])
+}
+
+// ============================================
+// Phase 2: Billing & Subscription
+// ============================================
+
+model Subscription {
+  id                    String   @id @default(cuid())
+  plan                  String   @default("free") // free, pro, team, enterprise
+  status                String   @default("active") // active, past_due, canceling, canceled, trialing
+  currentPeriodStart    DateTime @default(now())
+  currentPeriodEnd      DateTime @default(now())
+  cancelAtPeriodEnd     Boolean  @default(false)
+  trialEndsAt           DateTime?
+
+  // Payment gateway references (filled when Stripe/Paystack account is connected)
+  stripeCustomerId      String?  @unique
+  stripeSubscriptionId  String?  @unique
+  stripePriceId         String?
+  paystackCustomerId    String?  @unique
+  paystackSubscriptionCode String? @unique
+  paystackPlanCode      String?
+
+  // Gateway used for this subscription
+  gateway               String   @default("mock") // mock, stripe, paystack
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([plan])
+  @@index([stripeCustomerId])
+  @@index([paystackCustomerId])
+}
+
+model CreditBalance {
+  id                String   @id @default(cuid())
+  balance           Int      @default(0)   // Current available credits
+  monthlyAllowance  Int      @default(20)  // Credits granted per month based on plan
+  rolloverBalance   Int      @default(0)   // Accumulated rollover from previous months
+  purchasedBalance  Int      @default(0)   // Credits bought via one-time packs (never expire)
+  totalUsed         Int      @default(0)   // Lifetime credits used
+  totalReceived     Int      @default(0)   // Lifetime credits received
+
+  // Auto-recharge settings
+  autoRecharge      Boolean  @default(false)
+  autoRechargeThreshold Int  @default(0)   // Trigger when balance drops to this
+  autoRechargeAmount    Int  @default(50)  // Credits to add per recharge
+  autoRechargeMaxMonthly Int @default(0)   // Max $ to auto-recharge per month (0 = unlimited)
+
+  lastMonthlyReset  DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CreditTransaction {
+  id                String   @id @default(cuid())
+  type              String   // credit, debit, reservation, settlement, release, expiry
+  amount            Int      // Number of credits (positive)
+  balanceAfter      Int      // Balance after this transaction
+  action            String   // test_generation, test_execution, feature_discovery, visual_compare, auto_heal, monthly_allowance, credit_pack, auto_recharge, promo, refund, reservation, settlement, release
+  description       String   // Human-readable description
+
+  // Link to the resource that caused this transaction
+  referenceId       String?  // e.g., testRunId, projectId, stripePaymentIntentId
+  referenceType     String?  // test_run, project, payment, schedule, visual_diff
+
+  // Payment gateway reference
+  gatewayPaymentId  String?  // Stripe PaymentIntent ID, Paystack reference, etc.
+
+  // For reservations: tracks the state
+  reservationStatus String?  // pending, settled, released, expired
+
+  // Metadata
+  metadata          Json?
+
+  createdAt         DateTime @default(now())
+
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([action])
+  @@index([createdAt])
+  @@index([referenceType, referenceId])
 }

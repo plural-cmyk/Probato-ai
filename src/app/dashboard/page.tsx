@@ -53,6 +53,7 @@ import {
   MessageSquare,
   Hash,
   Trash,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -436,6 +437,20 @@ export default function DashboardPage() {
   const [addingChannel, setAddingChannel] = useState(false);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
 
+  // Billing state
+  const [billingData, setBillingData] = useState<{
+    plans: { slug: string; name: string; description: string; price: number; credits: number; maxProjects: number; features: string[]; popular?: boolean }[];
+    currentPlan: string;
+    subscription: { status: string; currentPeriodEnd: string; cancelAtPeriodEnd: boolean; gateway: string };
+    credits: { balance: number; monthlyAllowance: number; purchasedBalance: number; totalUsed: number; totalReceived: number; autoRecharge: boolean; autoRechargeAmount: number; autoRechargeThreshold: number };
+    recentTransactions: { id: string; type: string; amount: number; balanceAfter: number; action: string; description: string; createdAt: string }[];
+    creditCosts: Record<string, { credits: number; unit: string; description: string }>;
+    creditPacks: { credits: number; priceUsd: number; discountPercent: number; label: string }[];
+  } | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [showBillingPanel, setShowBillingPanel] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/signin");
@@ -469,6 +484,8 @@ export default function DashboardPage() {
         .then((res) => res.json())
         .then((data) => setUnreadCount(data.unreadCount ?? 0))
         .catch(() => {});
+      // Load billing data
+      loadBillingData();
     }
   }, [status, fetchProjects]);
 
@@ -1039,6 +1056,100 @@ export default function DashboardPage() {
     }
   }
 
+  // ── Billing functions ──────────────────────────────────────────
+
+  async function loadBillingData() {
+    setBillingLoading(true);
+    try {
+      const res = await fetch("/api/billing");
+      if (res.ok) {
+        const data = await res.json();
+        setBillingData(data);
+      }
+    } catch (error) {
+      console.error("Failed to load billing data:", error);
+    } finally {
+      setBillingLoading(false);
+    }
+  }
+
+  async function checkoutPlan(planSlug: string) {
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: planSlug }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          if (data.gateway === "mock") {
+            await fetch("/api/billing/subscription", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ plan: planSlug, gateway: "mock" }),
+            });
+            await loadBillingData();
+          } else {
+            window.location.href = data.url;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Checkout failed:", error);
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
+  async function purchaseCreditPack(packIndex: number) {
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch("/api/billing/credits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operation: "purchase_pack", packIndex }),
+      });
+      if (res.ok) {
+        await loadBillingData();
+      }
+    } catch (error) {
+      console.error("Credit pack purchase failed:", error);
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
+  async function cancelSubscription() {
+    if (!confirm("Are you sure you want to cancel? Your plan will revert to Free at the end of your billing period.")) return;
+    try {
+      const res = await fetch("/api/billing/subscription", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel" }),
+      });
+      if (res.ok) {
+        await loadBillingData();
+      }
+    } catch (error) {
+      console.error("Cancel failed:", error);
+    }
+  }
+
+  async function toggleAutoRecharge(enabled: boolean) {
+    try {
+      await fetch("/api/billing/credits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operation: "update_auto_recharge", autoRecharge: enabled }),
+      });
+      await loadBillingData();
+    } catch (error) {
+      console.error("Failed to update auto-recharge:", error);
+    }
+  }
+
   // ── Notification functions ──────────────────────────────────────
 
   async function loadNotifications() {
@@ -1223,6 +1334,23 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Billing Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setShowBillingPanel(!showBillingPanel);
+                if (!showBillingPanel && !billingData) loadBillingData();
+              }}
+            >
+              <CreditCard className="h-5 w-5 text-deep-indigo" />
+            </Button>
+            {billingData && (
+              <Badge variant="outline" className="text-xs border-deep-indigo/30 text-deep-indigo">
+                {billingData.credits.balance} credits
+              </Badge>
+            )}
+
             {/* Notification Bell */}
             <div className="relative">
               <Button
@@ -3418,6 +3546,196 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Billing Dialog */}
+      <Dialog open={showBillingPanel} onOpenChange={setShowBillingPanel}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Billing &amp; Subscription
+            </DialogTitle>
+            <DialogDescription>
+              Manage your plan, credits, and subscription
+            </DialogDescription>
+          </DialogHeader>
+
+          {billingLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-deep-indigo" />
+            </div>
+          ) : billingData ? (
+            <div className="space-y-6">
+              {/* Current Plan Summary */}
+              <Card className="border-deep-indigo/20 bg-deep-indigo/5">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">
+                        {billingData.plans.find((p: { slug: string; name: string; description: string; price: number; credits: number; maxProjects: number; features: string[]; popular?: boolean }) => p.slug === billingData.currentPlan)?.name ?? "Free"} Plan
+                      </CardTitle>
+                      <CardDescription>
+                        {billingData.subscription.status === "canceling"
+                          ? `Cancels on ${new Date(billingData.subscription.currentPeriodEnd).toLocaleDateString()}`
+                          : `Renews on ${new Date(billingData.subscription.currentPeriodEnd).toLocaleDateString()}`}
+                      </CardDescription>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-deep-indigo">{billingData.credits.balance}</div>
+                      <div className="text-xs text-muted-foreground">credits remaining</div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Monthly:</span> {billingData.credits.monthlyAllowance}</div>
+                    <div><span className="text-muted-foreground">Purchased:</span> {billingData.credits.purchasedBalance}</div>
+                    <div><span className="text-muted-foreground">Used:</span> {billingData.credits.totalUsed}</div>
+                  </div>
+                  {billingData.credits.balance < billingData.credits.monthlyAllowance * 0.2 && billingData.credits.monthlyAllowance > 0 && (
+                    <div className="mt-3 rounded-md bg-amber/10 border border-amber/20 p-3 text-sm text-amber">
+                      Your credit balance is running low. Consider upgrading or purchasing a credit pack.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Plan Cards */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3">Available Plans</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {billingData.plans.filter((p: { slug: string }) => p.slug !== "enterprise").map((plan: { slug: string; name: string; description: string; price: number; credits: number; maxProjects: number; features: string[]; popular?: boolean }) => (
+                    <Card key={plan.slug} className={`relative ${plan.slug === billingData.currentPlan ? "border-deep-indigo ring-2 ring-deep-indigo/20" : ""} ${plan.popular ? "border-electric-violet" : ""}`}>
+                      {plan.popular && (
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2">
+                          <Badge className="bg-electric-violet text-white text-[10px]">Popular</Badge>
+                        </div>
+                      )}
+                      <CardHeader className="pb-2 pt-4">
+                        <CardTitle className="text-base">{plan.name}</CardTitle>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-bold">${plan.price}</span>
+                          <span className="text-xs text-muted-foreground">/month</span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pb-3">
+                        <div className="text-sm font-medium text-deep-indigo mb-2">{plan.credits} credits/month</div>
+                        <ul className="text-xs space-y-1 text-muted-foreground">
+                          {plan.features.slice(0, 4).map((f: string) => (
+                            <li key={f} className="flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3 text-emerald flex-shrink-0" />
+                              {f}
+                            </li>
+                          ))}
+                        </ul>
+                        <Button
+                          className="w-full mt-3"
+                          size="sm"
+                          variant={plan.slug === billingData.currentPlan ? "outline" : "default"}
+                          disabled={plan.slug === billingData.currentPlan || checkoutLoading}
+                          onClick={() => checkoutPlan(plan.slug)}
+                        >
+                          {plan.slug === billingData.currentPlan ? "Current Plan" : "Upgrade"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Credit Packs */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3">Buy Credits</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {billingData.creditPacks.map((pack: { credits: number; priceUsd: number; discountPercent: number; label: string }, i: number) => (
+                    <Card key={i}>
+                      <CardContent className="p-4">
+                        <div className="text-center">
+                          <div className="text-lg font-bold">{pack.credits}</div>
+                          <div className="text-xs text-muted-foreground">credits</div>
+                          <div className="text-base font-semibold mt-1">${pack.priceUsd}</div>
+                          {pack.discountPercent > 0 && (
+                            <Badge variant="secondary" className="text-[10px] mt-1">{pack.discountPercent}% off</Badge>
+                          )}
+                          <Button
+                            className="w-full mt-2"
+                            size="sm"
+                            variant="outline"
+                            disabled={checkoutLoading}
+                            onClick={() => purchaseCreditPack(i)}
+                          >
+                            Buy
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Auto-Recharge */}
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <div className="text-sm font-medium">Auto-Recharge</div>
+                  <div className="text-xs text-muted-foreground">
+                    Automatically add {billingData.credits.autoRechargeAmount} credits when balance hits {billingData.credits.autoRechargeThreshold}
+                  </div>
+                </div>
+                <Switch
+                  checked={billingData.credits.autoRecharge}
+                  onCheckedChange={toggleAutoRecharge}
+                />
+              </div>
+
+              {/* Credit Cost Reference */}
+              <div>
+                <h3 className="text-sm font-semibold mb-2">Credit Costs</h3>
+                <div className="rounded-lg border">
+                  {Object.entries(billingData.creditCosts).map(([action, cost]: [string, { credits: number; unit: string; description: string }]) => (
+                    <div key={action} className="flex items-center justify-between px-4 py-2 border-b last:border-b-0 text-sm">
+                      <span className="text-muted-foreground">{action.replace(/_/g, " ")}</span>
+                      <span className="font-medium">{cost.credits} credits {cost.unit}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recent Transactions */}
+              {billingData.recentTransactions.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">Recent Activity</h3>
+                  <div className="rounded-lg border">
+                    {billingData.recentTransactions.slice(0, 8).map((txn: { id: string; type: string; amount: number; balanceAfter: number; action: string; description: string; createdAt: string }) => (
+                      <div key={txn.id} className="flex items-center justify-between px-4 py-2 border-b last:border-b-0 text-sm">
+                        <div>
+                          <span className={txn.type === "credit" ? "text-emerald" : txn.type === "debit" ? "text-warm-red" : "text-muted-foreground"}>
+                            {txn.type === "credit" ? "+" : txn.type === "debit" ? "-" : ""}{txn.amount}
+                          </span>
+                          <span className="text-muted-foreground ml-2">{txn.description}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(txn.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Cancel Subscription */}
+              {billingData.currentPlan !== "free" && billingData.subscription.status !== "canceling" && (
+                <div className="pt-4 border-t">
+                  <Button variant="ghost" className="text-warm-red" onClick={cancelSubscription}>
+                    Cancel Subscription
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">Failed to load billing data</div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

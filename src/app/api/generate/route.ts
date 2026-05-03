@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { generatePlaywrightTest, generateTestSuite, generateCombinedTestFile } from "@/lib/agent/test-generator";
 import { sel, actions } from "@/lib/agent/actions";
+import { checkCredits, deductCredits } from "@/lib/billing/credits";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,27 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { projectId, featureId, url, actions, format } = body;
+
+    // ── Credit check & deduction ──
+    const creditCheck = await checkCredits(session.user.id, "test_generation");
+    if (!creditCheck.hasCredits) {
+      return NextResponse.json({
+        error: "Insufficient credits",
+        details: `Test generation requires ${creditCheck.required} credits. You have ${creditCheck.balance}.`,
+        creditsRequired: creditCheck.required,
+        creditsBalance: creditCheck.balance,
+      }, { status: 402 });
+    }
+    const creditDeduction = await deductCredits(
+      session.user.id,
+      "test_generation",
+      `Test generation for ${projectId ?? featureId ?? "unknown"}`,
+      projectId ?? featureId,
+      projectId ? "project" : "feature"
+    );
+    if (!creditDeduction.success) {
+      return NextResponse.json({ error: "Credit deduction failed", details: "Could not deduct credits for test generation" }, { status: 402 });
+    }
 
     // Mode 1: Generate for a single feature
     if (featureId) {

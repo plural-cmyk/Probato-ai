@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { discoverFeatures, getProjectFeatures, clearProjectFeatures } from "@/lib/agent/feature-discovery";
+import { checkCredits, deductCredits } from "@/lib/billing/credits";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -34,6 +35,26 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Discover] Starting discovery for ${url} (project: ${projectId})`);
 
+    // ── Credit check & deduction ──
+    const creditCheck = await checkCredits(session.user.id, "feature_discovery");
+    if (!creditCheck.hasCredits) {
+      return NextResponse.json({
+        error: "Insufficient credits",
+        details: `Feature discovery requires ${creditCheck.required} credits. You have ${creditCheck.balance}.`,
+        creditsRequired: creditCheck.required,
+        creditsBalance: creditCheck.balance,
+      }, { status: 402 });
+    }
+    const creditDeduction = await deductCredits(
+      session.user.id,
+      "feature_discovery",
+      `Feature discovery for ${url}`,
+      projectId,
+      "project"
+    );
+    if (!creditDeduction.success) {
+      return NextResponse.json({ error: "Credit deduction failed", details: "Could not deduct credits for feature discovery" }, { status: 402 });
+    }
     // Optionally clear existing features before re-discovery
     if (clearExisting) {
       try {

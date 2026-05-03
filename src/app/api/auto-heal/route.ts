@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { autoHealTestRun } from "@/lib/agent/auto-heal";
 import { db } from "@/lib/db";
 import { dispatchNotification } from "@/lib/notifications/dispatcher";
+import { checkCredits, deductCredits } from "@/lib/billing/credits";
+import { checkFeatureAccess } from "@/lib/billing/subscription";
 
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
@@ -67,6 +69,37 @@ export async function POST(request: NextRequest) {
 
     if (!targetUrl) {
       return NextResponse.json({ error: "URL is required for auto-heal. Provide the target page URL." }, { status: 400 });
+    }
+
+    // ── Plan feature check (auto-heal requires Pro+) ──
+    const featureAccess = await checkFeatureAccess(session.user.id, "autoHeal");
+    if (!featureAccess.allowed) {
+      return NextResponse.json({
+        error: "Feature not available",
+        details: featureAccess.reason ?? "Auto-heal requires the Pro plan or higher",
+        requiredPlan: featureAccess.requiredPlan,
+      }, { status: 403 });
+    }
+
+    // ── Credit check & deduction ──
+    const creditCheck = await checkCredits(session.user.id, "auto_heal");
+    if (!creditCheck.hasCredits) {
+      return NextResponse.json({
+        error: "Insufficient credits",
+        details: `Auto-heal requires ${creditCheck.required} credits. You have ${creditCheck.balance}.`,
+        creditsRequired: creditCheck.required,
+        creditsBalance: creditCheck.balance,
+      }, { status: 402 });
+    }
+    const creditDeduction = await deductCredits(
+      session.user.id,
+      "auto_heal",
+      `Auto-heal for test run ${testRunId}`,
+      testRunId,
+      "test_run"
+    );
+    if (!creditDeduction.success) {
+      return NextResponse.json({ error: "Credit deduction failed", details: "Could not deduct credits for auto-heal" }, { status: 402 });
     }
 
     console.log(`[Auto-Heal] Starting heal for test run ${testRunId} with ${failedSteps.length} failed step(s)`);
