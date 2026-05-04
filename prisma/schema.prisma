@@ -141,6 +141,7 @@ model Feature {
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   testCases TestCase[]
+  riskScore FeatureRiskScore?
 
   @@index([projectId])
   @@index([type])
@@ -844,4 +845,31 @@ model Comment {
   @@index([testRunId])
   @@index([parentId])
   @@index([createdAt])
+}
+
+// ============================================
+// M20: Test Intelligence Models
+// ============================================
+
+model FeatureRiskScore {
+  id              String   @id @default(cuid())
+  featureId       String
+  feature         Feature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  riskScore       Float    @default(0)   // 0-100 composite risk score
+  flakeRate       Float    @default(0)   // 0-1 ratio of intermittent failures
+  failRate        Float    @default(0)   // 0-1 ratio of total failures
+  avgDuration     Float    @default(0)   // average test duration in ms
+  lastFailedAt    DateTime?              // when this feature's test last failed
+  autoHealCount   Int      @default(0)   // number of auto-heal events
+  failCluster     String?               // categorized failure reason (selector, timeout, assertion, etc.)
+
+  computedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([featureId])
+  @@index([riskScore])
+  @@index([flakeRate])
+  @@index([failRate])
 }

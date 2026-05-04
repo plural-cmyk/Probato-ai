@@ -104,6 +104,7 @@ import LiveTestView from "@/components/live-test-view";
 import OnboardingChecklist from "@/components/onboarding-checklist";
 import TeamCollaborationPanel from "@/components/team-collaboration-panel";
 import ShareProjectDialog from "@/components/share-project-dialog";
+import TestIntelligencePanel from "@/components/test-intelligence-panel";
 
 interface Project {
   id: string;
@@ -489,6 +490,7 @@ export default function DashboardPage() {
 
   // Team Collaboration state
   const [showTeamPanel, setShowTeamPanel] = useState(false);
+  const [showIntelligencePanel, setShowIntelligencePanel] = useState(false);
   const [shareDialogProject, setShareDialogProject] = useState<{ id: string; name: string } | null>(null);
 
   // Live Test View state
@@ -1519,6 +1521,17 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Test Intelligence Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowIntelligencePanel(!showIntelligencePanel)}
+              title="Test Intelligence"
+              className={showIntelligencePanel ? "bg-electric-violet/10" : ""}
+            >
+              <BrainCircuit className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
             {/* Team Collaboration Button */}
             <Button
               variant="ghost"
@@ -1934,6 +1947,17 @@ export default function DashboardPage() {
 
         {/* Onboarding Checklist */}
         <OnboardingChecklist />
+
+        {/* Test Intelligence Dashboard (M20) */}
+        {showIntelligencePanel && (
+          <Card className="mb-8 border-border/50">
+            <CardContent className="p-6">
+              <TestIntelligencePanel
+                projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Quick Stats */}
         <div className="mb-8 grid gap-4 sm:grid-cols-4">
