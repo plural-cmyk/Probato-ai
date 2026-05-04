@@ -61,6 +61,7 @@ import {
   BookOpen,
   Users,
   Share2,
+  Monitor,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
