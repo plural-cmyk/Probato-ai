@@ -519,16 +519,24 @@ export default function DashboardPage() {
       fetchProjects();
       // Check browser availability
       fetch("/api/browser/check")
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error("Browser check failed");
+          return res.json();
+        })
         .then((data) => setBrowserStatus(data))
         .catch(() => setBrowserStatus({ available: false, mode: "unavailable", error: "Failed to check" }));
       // Load notification unread count
       fetch("/api/notifications?limit=1")
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error("Notifications fetch failed");
+          return res.json();
+        })
         .then((data) => setUnreadCount(data.unreadCount ?? 0))
         .catch(() => {});
       // Load billing data
-      loadBillingData();
+      loadBillingData().catch((err) => {
+        console.error("Failed to load billing data on mount:", err);
+      });
     }
   }, [status, fetchProjects]);
 
