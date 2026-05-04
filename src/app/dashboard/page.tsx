@@ -96,6 +96,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import LiveTestView from "@/components/live-test-view";
 
 interface Project {
   id: string;
@@ -479,6 +481,10 @@ export default function DashboardPage() {
     statusBreakdown: { statusCode: number; count: number }[];
   } | null>(null);
 
+  // Live Test View state
+  const [liveTestRunning, setLiveTestRunning] = useState(false);
+  const [liveTestAbortController, setLiveTestAbortController] = useState<AbortController | null>(null);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/signin");
@@ -709,6 +715,43 @@ export default function DashboardPage() {
     } finally {
       setTestRunning(false);
     }
+  }
+
+  // ── Live Test View handler ──
+  async function handleLiveTestRun(url: string, preset: string): Promise<Response | null> {
+    setLiveTestRunning(true);
+    const controller = new AbortController();
+    setLiveTestAbortController(controller);
+    try {
+      const res = await fetch("/api/test/run-live", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, preset }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Request failed" }));
+        alert(data.error || data.details || "Live test failed to start");
+        setLiveTestRunning(false);
+        return null;
+      }
+      return res;
+    } catch (error) {
+      if ((error as Error).name !== "AbortError") {
+        console.error("Live test failed:", error);
+        alert("Live test failed to start. The browser service may be unavailable.");
+      }
+      setLiveTestRunning(false);
+      return null;
+    }
+  }
+
+  function handleLiveTestCancel() {
+    if (liveTestAbortController) {
+      liveTestAbortController.abort();
+      setLiveTestAbortController(null);
+    }
+    setLiveTestRunning(false);
   }
 
   async function discoverPageFeatures() {
@@ -2217,6 +2260,31 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Live Test View Section */}
+        <Card className="mb-8 border-border/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan/10">
+                <Monitor className="h-4 w-4 text-cyan-600" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Live Test View</CardTitle>
+                <CardDescription className="text-xs">
+                  Watch tests execute in real-time with step-by-step browser screenshots and diagnostics
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <LiveTestView
+              onRunTest={handleLiveTestRun}
+              isRunning={liveTestRunning}
+              onCancel={handleLiveTestCancel}
+              onComplete={() => setLiveTestRunning(false)}
+            />
           </CardContent>
         </Card>
 
