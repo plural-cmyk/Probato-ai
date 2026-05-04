@@ -911,8 +911,8 @@ M15: Live Test Execution View           ✅
 M16: Fix Suggestion & Approval Workflow ✅
 M17: Security & Accessibility Testing   ✅
 M18: Enhanced Landing Page & Onboarding ✅
-M19: Team Collaboration & Test Sharing  🔲
-M20: Test Intelligence Dashboard        🔲
+M19: Team Collaboration & Test Sharing  ✅
+M20: Test Intelligence Dashboard        ✅
 
 ---
 Task ID: 5
@@ -1094,3 +1094,47 @@ Stage Summary:
 - Next error will show a user-friendly message with the actual error details
 - This makes diagnosing the root cause much easier for future debugging
 
+
+---
+Task ID: 20
+Agent: main
+Task: M20 - Test Intelligence Dashboard
+
+Work Log:
+- Fixed critical bug: Missing `Monitor` icon import in dashboard/page.tsx that caused client-side crash after onboarding
+- Added `FeatureRiskScore` model to Prisma schema with fields: riskScore, flakeRate, failRate, avgDuration, lastFailedAt, autoHealCount, failCluster
+- Added `FeatureRiskScore` relation to Feature model (1:1)
+- Created `/api/dashboard/intelligence` API endpoint with comprehensive analytics:
+  - Health Score: 0-100 composite metric (pass rate - flake penalty - duration penalty)
+  - Pass Rate Trend: daily pass rate over configurable date range
+  - Duration Trend: daily average duration
+  - Flaky Test Detection: tests with intermittent pass/fail patterns (>10% each direction)
+  - Failure Clusters: grouped by category (timeout, selector, assertion, navigation, network, auth, other)
+  - Auto-Heal Analytics: total/applied/rejected/pending counts, success rate, avg confidence, by-type breakdown
+  - Slowest Tests: top 10 by duration
+  - Feature Risk Scores: composite risk (fail rate * 50 + flake rate * 25 + duration factor)
+  - Security & A11y Score Trends: per-scan/audit scores over time
+  - AI-generated Recommendations: priority-ranked actionable insights
+  - Supports `projectId` and `days` query params for filtering
+  - Persists computed risk scores to FeatureRiskScore table
+- Created `TestIntelligencePanel` component with:
+  - Health Score gauge (circular SVG with color coding)
+  - Sparkline charts for pass rate and duration trends
+  - Mini stat cards (Total Runs, Avg Duration, Flaky Tests, Auto-Heal Rate)
+  - Expandable sections for Recommendations, Flaky Tests, Failure Clusters, Risk Scores, Auto-Heal, Slowest Tests
+  - Project selector and date range selector (7/14/30/90 days)
+  - Pass/fail pattern visualization for flaky tests
+  - Priority badges for recommendations (critical/high/medium/low)
+  - Color-coded risk score indicators
+- Integrated TestIntelligencePanel into dashboard with toggle button (BrainCircuit icon)
+- Build verified successfully
+- Pushed to GitHub for Vercel deployment
+
+Stage Summary:
+- ✅ M20 COMPLETE - Test Intelligence Dashboard
+- Fixed client-side crash bug (missing Monitor import)
+- New API: /api/dashboard/intelligence
+- New Prisma model: FeatureRiskScore
+- New component: TestIntelligencePanel
+- All 20 milestones (M1-M20) are now COMPLETE
+- PHASE 3 is COMPLETE
