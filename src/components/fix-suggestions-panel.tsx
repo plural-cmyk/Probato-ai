@@ -687,7 +687,3 @@ export default function FixSuggestionsPanel({
     </Card>
   );
 }
-
-// ── Export the generate function for external use ──
-
-export { handleGenerateForResult as generateFixSuggestionsForResult };
