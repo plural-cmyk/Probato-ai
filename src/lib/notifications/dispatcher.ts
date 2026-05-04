@@ -23,6 +23,7 @@ export type NotificationType =
   | "visual_diff"
   | "schedule_complete"
   | "auto_heal"
+  | "fix_suggestion"
   | "webhook_received";
 
 export type NotificationPriority = "low" | "normal" | "high" | "critical";
@@ -72,6 +73,7 @@ const DEFAULT_PREFERENCES: Record<NotificationType, { inApp: boolean; email: boo
   visual_diff:         { inApp: true,  email: false, slack: true,  webhook: false },
   schedule_complete:   { inApp: true,  email: false, slack: false, webhook: false },
   auto_heal:           { inApp: true,  email: false, slack: false, webhook: false },
+  fix_suggestion:      { inApp: true,  email: false, slack: true,  webhook: false },
   webhook_received:    { inApp: true,  email: false, slack: false, webhook: false },
 };
 
@@ -272,7 +274,7 @@ export async function ensureUserPreferences(userId: string): Promise<{
 }[]> {
   const eventTypes: NotificationType[] = [
     "test_pass", "test_fail", "test_error", "visual_diff",
-    "schedule_complete", "auto_heal", "webhook_received",
+    "schedule_complete", "auto_heal", "fix_suggestion", "webhook_received",
   ];
 
   const prefs = [];
@@ -587,6 +589,7 @@ function getNotificationEmoji(type: NotificationType): string {
     visual_diff: "👁️",
     schedule_complete: "📅",
     auto_heal: "🩹",
+    fix_suggestion: "💡",
     webhook_received: "🔗",
   };
   return emojiMap[type] ?? "🔔";
@@ -600,6 +603,7 @@ function getNotificationColor(type: NotificationType): string {
     visual_diff: "#6c3ce1",
     schedule_complete: "#3b82f6",
     auto_heal: "#8b5cf6",
+    fix_suggestion: "#f59e0b",
     webhook_received: "#6b7280",
   };
   return colorMap[type] ?? "#6c3ce1";
@@ -616,6 +620,7 @@ export function getNotificationTypeDescription(type: NotificationType): string {
     visual_diff: "When a visual regression diff is detected",
     schedule_complete: "When a scheduled test run completes",
     auto_heal: "When auto-heal fixes a broken test",
+    fix_suggestion: "When an AI fix suggestion is generated",
     webhook_received: "When a GitHub webhook event is received",
   };
   return descriptions[type] ?? type;

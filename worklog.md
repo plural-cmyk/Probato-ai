@@ -709,3 +709,84 @@ Stage Summary:
 - Core architecture: AsyncGenerator + ReadableStream (Vercel-compatible real-time streaming)
 - New API routes: POST /api/test/run-live, GET /api/test/runs/[id], GET /api/test/runs/[id]/screenshot
 - Dashboard UI: Live Test View section with real-time step feed and browser screenshots
+
+---
+Task ID: 16
+Agent: Main Agent
+Task: M16 — Fix Suggestion & Approval Workflow
+
+Work Log:
+- Added FixSuggestion Prisma model (21 total models now)
+  - Fields: title, description, type (5 fix types), status (pending/approved/rejected/applied/failed), confidence (0-1), diff, originalCode, suggestedCode, reasoning, appliedAt, appliedBy, reviewNote, errorMessage, stepIndex, metadata
+  - Relations: testResult, testRun, project, testCase (optional)
+  - 6 indexes: testResultId, testRunId, projectId, status, type, createdAt
+- Added fixSuggestions relations to: TestResult, TestRun, Project, TestCase models
+- Created Fix Suggestion Engine (src/lib/agent/fix-suggester.ts):
+  - generateFixSuggestions(): main entry point — generates AI-powered fix suggestions for failed test steps
+  - 5 fix types: selector_fix, assertion_fix, code_fix, config_fix, dependency_fix
+  - 3-tier LLM strategy (same as provider.ts): z-ai-web-dev-sdk → external OpenAI API → rule-based fallback
+  - Rule-based fallback covers: element not found, text assertion mismatch, URL assertion mismatch, timeout/navigation errors, not-visible errors, generic fallback
+  - Confidence scoring (0-1) with descriptive labels
+  - Generates unified diffs and code suggestions
+  - Credit deduction integrated (10 credits per suggestion generation)
+  - Notification dispatch (fix_suggestion type) after generation
+  - Persists suggestions to DB for review workflow
+  - applyFixSuggestion(): applies approved fix — updates test case code and selector, marks as applied
+  - rejectFixSuggestion(): rejects a pending suggestion with optional review note
+- Created API routes:
+  - GET /api/fix-suggestions — list with filtering (projectId, testRunId, status, type), pagination
+  - POST /api/fix-suggestions — generate fix suggestions for a failed test result
+  - GET /api/fix-suggestions/[id] — get single suggestion with full context
+  - PATCH /api/fix-suggestions/[id] — approve or reject a suggestion
+  - POST /api/fix-suggestions/[id]/apply — apply an approved fix to update test case code
+- Added fix_suggestion credit action (10 credits, highest cost action)
+- Added fix_suggestion notification type with 💡 emoji and amber color
+- Updated notification dispatcher: preferences, defaults, descriptions for fix_suggestion events
+- Built FixSuggestionsPanel component (src/components/fix-suggestions-panel.tsx):
+  - Fix type badges with icons and color coding (5 types)
+  - Confidence indicator with progress bar and labels
+  - Diff viewer with syntax-highlighted unified diffs
+  - Code block viewer for original and suggested code
+  - Approve/Reject/Apply action buttons
+  - Reject with optional review note
+  - Filter tabs: All, Pending, Approved, Applied, Rejected
+  - Expandable AI reasoning section
+  - Status tracking with color-coded badges
+  - Summary footer with counts per status
+- Integrated into project detail page:
+  - "Suggest Fix" button on each failed test result (Lightbulb icon)
+  - FixSuggestionsPanel section below test run history
+  - Auto-refreshes panel when suggestions are generated
+  - onSuggestionApplied callback reloads project data
+- Updated OpenAPI spec with Fix Suggestions endpoints
+- Wrote 23 tests covering:
+  - selector_fix for element not found errors
+  - assertion_fix for text/URL assertion mismatches
+  - config_fix for timeout errors
+  - dependency_fix for URL changes
+  - Credit checking before generation
+  - Insufficient credits error handling
+  - Credit deduction after successful generation
+  - DB persistence of suggestions
+  - Notification dispatch
+  - Confidence scores (0-1 range)
+  - Reasoning in suggestions
+  - Generic fallback for unknown errors
+  - applyFixSuggestion: success, invalid status, not found
+  - rejectFixSuggestion: success, non-pending rejection
+  - Credit cost validation (fix_suggestion = 10 credits)
+  - Notification type description
+  - API validation: required fields, valid statuses, valid fix types
+- All 202 tests passing (23 new + 179 previous)
+- Build verified: 70 routes (3 new), clean compilation
+- Prisma client regenerated
+
+Stage Summary:
+- M16 (Fix Suggestion & Approval Workflow) is COMPLETE
+- AI-powered fix suggestion engine with 3-tier LLM + rule-based fallback
+- 5 fix types: selector_fix, assertion_fix, code_fix, config_fix, dependency_fix
+- Full approval workflow: Pending → Approved → Applied (or Rejected)
+- Dashboard UI with diff viewer, confidence indicators, and action buttons
+- Integrated with credit system (10 credits), notifications, and existing test results
+- 3 new API routes, 1 new Prisma model, 1 new component
+- 23 new tests

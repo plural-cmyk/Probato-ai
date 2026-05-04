@@ -402,10 +402,10 @@ describe("Credit Calculation Scenarios", () => {
     expect(totalMinutes).toBe(100);
   });
 
-  it("auto-heal is most expensive action at 8 credits", () => {
+  it("fix_suggestion is the most expensive action at 10 credits", () => {
     const allCosts = Object.values(CREDIT_COSTS).map((c) => c.credits);
     const maxCost = Math.max(...allCosts);
-    expect(CREDIT_COSTS.auto_heal.credits).toBe(maxCost);
+    expect(CREDIT_COSTS.fix_suggestion.credits).toBe(maxCost);
   });
 });
 

@@ -144,6 +144,7 @@ export type CreditAction =
   | "feature_discovery"
   | "visual_compare"
   | "auto_heal"
+  | "fix_suggestion"
   | "screenshot_storage";
 
 export interface CreditCostDefinition {
@@ -189,6 +190,13 @@ export const CREDIT_COSTS: Record<CreditAction, CreditCostDefinition> = {
     unit: "per use",
     description: "AI-powered auto-heal for broken test selectors",
     estimatedCostUsd: 0.25,
+  },
+  fix_suggestion: {
+    action: "fix_suggestion",
+    credits: 10,
+    unit: "per use",
+    description: "AI-powered fix suggestion with code diff and reasoning",
+    estimatedCostUsd: 0.30,
   },
   screenshot_storage: {
     action: "screenshot_storage",

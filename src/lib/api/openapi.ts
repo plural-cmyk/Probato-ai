@@ -539,6 +539,85 @@ export function generateOpenAPISpec(baseUrl: string = "https://probato.ai"): Ope
         },
       },
 
+      // ── Fix Suggestions ──
+      "/fix-suggestions": {
+        get: {
+          tags: ["Fix Suggestions"],
+          summary: "List fix suggestions",
+          description: "List AI-generated fix suggestions for failed tests",
+          parameters: [
+            { name: "projectId", in: "query", schema: { type: "string" }, description: "Filter by project" },
+            { name: "testRunId", in: "query", schema: { type: "string" }, description: "Filter by test run" },
+            { name: "status", in: "query", schema: { type: "string", enum: ["pending", "approved", "rejected", "applied", "failed"] } },
+            { name: "type", in: "query", schema: { type: "string", enum: ["selector_fix", "assertion_fix", "code_fix", "config_fix", "dependency_fix"] } },
+            { name: "limit", in: "query", schema: { type: "integer", default: 50 } },
+            { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
+          ],
+          responses: { "200": { description: "Fix suggestion list" } },
+        },
+        post: {
+          tags: ["Fix Suggestions"],
+          summary: "Generate fix suggestions",
+          description: "Generate AI-powered fix suggestions for a failed test result. Costs 10 credits.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["testResultId", "testRunId", "projectId"],
+                  properties: {
+                    testResultId: { type: "string", description: "Failed test result ID" },
+                    testRunId: { type: "string", description: "Test run ID" },
+                    projectId: { type: "string", description: "Project ID" },
+                    stepIndex: { type: "integer", description: "Step index in the test run" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "201": { description: "Fix suggestions generated" }, "402": { description: "Insufficient credits" } },
+        },
+      },
+      "/fix-suggestions/{id}": {
+        get: {
+          tags: ["Fix Suggestions"],
+          summary: "Get fix suggestion",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Fix suggestion details" }, "404": { description: "Not found" } },
+        },
+        patch: {
+          tags: ["Fix Suggestions"],
+          summary: "Approve or reject fix suggestion",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["status"],
+                  properties: {
+                    status: { type: "string", enum: ["approved", "rejected"] },
+                    reviewNote: { type: "string", description: "Optional review note" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Updated" }, "400": { description: "Invalid status" } },
+        },
+      },
+      "/fix-suggestions/{id}/apply": {
+        post: {
+          tags: ["Fix Suggestions"],
+          summary: "Apply fix suggestion",
+          description: "Apply an approved fix suggestion to update the test case code",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Fix applied successfully" }, "400": { description: "Cannot apply" } },
+        },
+      },
+
       // ── Billing ──
       "/billing": {
         get: {
@@ -586,6 +665,7 @@ export function generateOpenAPISpec(baseUrl: string = "https://probato.ai"): Ope
       { name: "Generation", description: "AI-powered test generation" },
       { name: "Schedules", description: "Scheduled and recurring tests" },
       { name: "Visual Regression", description: "Visual baseline and diff management" },
+      { name: "Fix Suggestions", description: "AI-powered fix suggestions and approval workflow" },
       { name: "Billing", description: "Subscription and credit management" },
       { name: "Usage", description: "API usage analytics" },
     ],

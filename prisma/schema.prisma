@@ -101,6 +101,7 @@ model Project {
   visualBaselines VisualBaseline[]
   visualDiffs     VisualDiff[]
   notifications   Notification[]
+  fixSuggestions  FixSuggestion[]
 
   @@index([userId])
 }
@@ -145,6 +146,7 @@ model TestRun {
 
   visualDiffs VisualDiff[]
   notifications Notification[]
+  fixSuggestions FixSuggestion[]
 
   @@index([projectId])
   @@index([status])
@@ -164,6 +166,8 @@ model TestResult {
   testRunId String
   testRun   TestRun @relation(fields: [testRunId], references: [id], onDelete: Cascade)
 
+  fixSuggestions FixSuggestion[]
+
   @@index([testRunId])
   @@index([status])
 }
@@ -180,6 +184,8 @@ model TestCase {
 
   featureId String
   feature   Feature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  fixSuggestions FixSuggestion[]
 
   @@index([featureId])
 }
@@ -504,6 +510,50 @@ model CreditTransaction {
   @@index([action])
   @@index([createdAt])
   @@index([referenceType, referenceId])
+}
+
+// ============================================
+// Phase 3: Fix Suggestion & Approval Workflow
+// ============================================
+
+model FixSuggestion {
+  id              String   @id @default(cuid())
+  title           String   // Short human-readable description of the fix
+  description     String   // Detailed explanation of what the fix does and why
+  type            String   // selector_fix, code_fix, config_fix, dependency_fix, assertion_fix
+  status          String   @default("pending") // pending, approved, rejected, applied, failed
+  confidence      Float    @default(0) // 0-1, AI confidence score for this suggestion
+  diff            String?  // Unified diff of the suggested code change
+  originalCode    String?  // The original code before the fix
+  suggestedCode   String?  // The full suggested replacement code
+  reasoning       String?  // AI reasoning for why this fix should work
+  appliedAt       DateTime?
+  appliedBy       String?  // User ID who approved/applied the fix
+  reviewNote      String?  // Optional note when approving/rejecting
+  errorMessage    String?  // The original error that triggered this suggestion
+  stepIndex       Int?     // Step index in the test run (which step failed)
+  metadata        Json?    // Additional structured data (selector info, LLM context, etc.)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  testResultId    String
+  testResult      TestResult @relation(fields: [testResultId], references: [id], onDelete: Cascade)
+
+  testRunId       String
+  testRun         TestRun @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  projectId       String
+  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  testCaseId      String?  // Link to the test case that would be updated
+  testCase        TestCase? @relation(fields: [testCaseId], references: [id], onDelete: SetNull)
+
+  @@index([testResultId])
+  @@index([testRunId])
+  @@index([projectId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
 }
 
 // ============================================

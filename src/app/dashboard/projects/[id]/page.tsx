@@ -21,10 +21,12 @@ import {
   Timer,
   Zap,
   BarChart3,
+  Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import FixSuggestionsPanel from "@/components/fix-suggestions-panel";
 
 interface Feature {
   id: string;
@@ -98,6 +100,8 @@ export default function ProjectDetailPage() {
   const [expandedRun, setExpandedRun] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [suggestingFixFor, setSuggestingFixFor] = useState<string | null>(null);
+  const [fixPanelKey, setFixPanelKey] = useState(0);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -462,6 +466,44 @@ export default function ProjectDetailPage() {
                             {result.error && (
                               <span className="text-xs text-warm-red truncate max-w-[200px] shrink-0">{result.error.substring(0, 60)}</span>
                             )}
+                            {(result.status === "failed" || result.status === "error") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs gap-1 text-amber-600 hover:text-amber-700 hover:bg-amber/10"
+                                disabled={suggestingFixFor === result.id}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  setSuggestingFixFor(result.id);
+                                  try {
+                                    const res = await fetch("/api/fix-suggestions", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        testResultId: result.id,
+                                        testRunId: run.id,
+                                        projectId,
+                                        stepIndex: run.results.indexOf(result),
+                                      }),
+                                    });
+                                    if (res.ok) {
+                                      setFixPanelKey((k) => k + 1);
+                                    }
+                                  } catch (err) {
+                                    console.error("Fix suggestion failed:", err);
+                                  } finally {
+                                    setSuggestingFixFor(null);
+                                  }
+                                }}
+                              >
+                                {suggestingFixFor === result.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Lightbulb className="h-3 w-3" />
+                                )}
+                                Suggest Fix
+                              </Button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -472,6 +514,15 @@ export default function ProjectDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Fix Suggestions */}
+        <div className="mt-8">
+          <FixSuggestionsPanel
+            key={fixPanelKey}
+            projectId={projectId}
+            onSuggestionApplied={() => loadProjectData()}
+          />
+        </div>
       </main>
     </div>
   );
