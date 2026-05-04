@@ -657,3 +657,55 @@ Stage Summary:
 - OpenAPI 3.0.3 spec at /api/v1/docs
 - Dashboard UI for API key management and usage stats
 - All code pushed to GitHub
+---
+Task ID: 15
+Agent: Main Agent
+Task: M15 — Live Test Execution View
+
+Work Log:
+- Built live test executor (src/lib/agent/live-test-executor.ts) using AsyncGenerator pattern
+  - Yields step-by-step events as they happen (run_start, step_start, step_complete, step_skipped, run_complete, console, network, error)
+  - Captures browser console errors and failed network requests per step
+  - Supports cancellation via AbortSignal
+  - Same action execution logic as existing test-executor.ts
+- Created streaming API route (POST /api/test/run-live)
+  - Returns ReadableStream with newline-delimited JSON events
+  - Works on Vercel serverless (no WebSocket required)
+  - Auto-creates 'Live Tests' project if no projectId specified
+  - Persists step results to DB as they complete
+  - Updates test run status on completion
+  - Credit deduction integrated (2 credits per execution)
+  - Preset action builders (smoke, navigation, login, form, full-page-screenshot)
+- Created test run detail API (GET /api/test/runs/[id])
+  - Returns full test run with step details for replay
+  - Cancel support (PATCH with action=cancel)
+- Created screenshot API (GET /api/test/runs/[id]/screenshot?stepIndex=N)
+  - Returns PNG image on demand for step replay
+  - 24-hour cache header
+- Built LiveTestView dashboard component (src/components/live-test-view.tsx)
+  - 2-column layout: Step Progress Feed + Browser Screenshot Viewer
+  - Real-time step status icons (passed/failed/running/skipped/pending)
+  - Action type icons (navigate= globe, click=lightning, fill=terminal, etc.)
+  - Expandable step details: errors, actual text/URL, console messages, network requests
+  - Progress bar with elapsed timer
+  - Step navigation (Previous/Next) in screenshot viewer
+  - Diagnostics panel showing console errors and 4xx/5xx network requests
+  - Cancel button via AbortController
+  - Run complete summary with pass/fail counts
+  - Reset and Run Again buttons
+- Integrated LiveTestView into dashboard page
+  - New 'Live Test View' card section between Test Executor and Feature Discovery
+  - handleLiveTestRun() — fetches streaming response
+  - handleLiveTestCancel() — aborts via AbortController
+  - onComplete callback properly resets running state
+- Fixed .gitignore that was ignoring src/app/api/test/ directory
+  - Changed bare 'test' to '/coverage' to avoid ignoring API routes
+- Build: 69 routes (3 new), 179 tests passing
+- Pushed to GitHub (commit 719b571)
+
+Stage Summary:
+- M15 (Live Test Execution View) is COMPLETE
+- 5 new files, 2 modified files
+- Core architecture: AsyncGenerator + ReadableStream (Vercel-compatible real-time streaming)
+- New API routes: POST /api/test/run-live, GET /api/test/runs/[id], GET /api/test/runs/[id]/screenshot
+- Dashboard UI: Live Test View section with real-time step feed and browser screenshots
