@@ -3,8 +3,8 @@
     "src/app/api/browse/route.ts": {
       "memory": 2048
     },
-    "src/app/api/test/run/route.ts": {
-      "memory": 2048
+    "src/app/api/cron/run-schedules/route.ts": {
+      "maxDuration": 60
     }
   }
 }

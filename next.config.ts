@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // NOTE: "standalone" output is for Docker/self-hosted deployments.
   // When deploying to Vercel, the platform uses its own builder.
-  output: "standalone",
+  // output: "standalone", // Disabled for Vercel deployment — Vercel uses its own builder
   typescript: {
     ignoreBuildErrors: true,
   },

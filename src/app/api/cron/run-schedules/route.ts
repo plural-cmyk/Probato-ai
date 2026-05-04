@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeDueSchedules, recalculateNextRuns } from "@/lib/scheduler/engine";
 
-export const maxDuration = 300; // 5 minutes max for cron execution
+export const maxDuration = 60; // 60 seconds (Vercel Hobby compatible)
 export const dynamic = "force-dynamic";
 
 // ── POST /api/cron/run-schedules ─ Execute due schedules ───────────
