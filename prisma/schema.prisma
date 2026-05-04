@@ -81,6 +81,13 @@ model User {
   securityScans          SecurityScan[]
   a11yAudits             A11yAudit[]
   onboardingState        OnboardingState?
+  teamMemberships        TeamMember[]
+  sentInvitations        TeamInvitation[]  @relation("SentInvitations")
+  receivedInvitations    TeamInvitation[]  @relation("ReceivedInvitations")
+  comments               Comment[]
+  sharedWithMe           SharedProject[]   @relation("SharedWithUser")
+  ownedTeams             Team[]            @relation("OwnedTeams")
+  sharedProjects         SharedProject[]   @relation("SharedProjects")
 }
 
 model Project {
@@ -98,6 +105,10 @@ model Project {
 
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  teamId    String?
+  team      Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
   features        Feature[]
   testRuns        TestRun[]
   schedules       Schedule[]
@@ -107,8 +118,11 @@ model Project {
   fixSuggestions  FixSuggestion[]
   securityScans   SecurityScan[]
   a11yAudits      A11yAudit[]
+  comments        Comment[]
+  sharedWith      SharedProject[]
 
   @@index([userId])
+  @@index([teamId])
 }
 
 model Feature {
@@ -154,6 +168,7 @@ model TestRun {
   fixSuggestions FixSuggestion[]
   securityScans   SecurityScan[]
   a11yAudits      A11yAudit[]
+  comments        Comment[]
 
   @@index([projectId])
   @@index([status])
@@ -706,4 +721,127 @@ model OnboardingState {
 
   @@index([userId])
   @@index([currentStep])
+}
+
+// ============================================
+// Phase 3: Team Collaboration & Sharing
+// ============================================
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique // URL-friendly team name
+  description String?
+  avatarUrl   String?  // Team avatar/logo URL
+  plan        String   @default("team") // Team plan slug
+  maxMembers  Int      @default(10) // Max members allowed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerUserId String
+  owner       User     @relation("OwnedTeams", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  members     TeamMember[]
+  invitations TeamInvitation[]
+  projects    Project[]
+
+  @@index([ownerUserId])
+  @@index([slug])
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  role      String   @default("member") // owner, admin, member, viewer
+  status    String   @default("active") // active, suspended, removed
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@index([role])
+}
+
+model TeamInvitation {
+  id          String    @id @default(cuid())
+  email       String    // Email of the invited user
+  role        String    @default("member") // admin, member, viewer
+  token       String    @unique // Secure invitation token
+  status      String    @default("pending") // pending, accepted, declined, expired, cancelled
+  message     String?   // Optional personal message from inviter
+  expiresAt   DateTime  // When the invitation expires
+  acceptedAt  DateTime?
+  declinedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  teamId      String
+  team        Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  invitedByUserId String
+  invitedBy       User  @relation("SentInvitations", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  invitedUserId   String?
+  invitedUser     User? @relation("ReceivedInvitations", fields: [invitedUserId], references: [id], onDelete: SetNull)
+
+  @@index([teamId])
+  @@index([email])
+  @@index([token])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model SharedProject {
+  id          String   @id @default(cuid())
+  permission  String   @default("view") // view, edit, admin
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  sharedByUserId String
+  sharedBy       User   @relation("SharedWithUser", fields: [sharedByUserId], references: [id], onDelete: Cascade)
+
+  sharedWithUserId String
+  sharedWithUser   User  @relation("SharedProjects", fields: [sharedWithUserId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, sharedWithUserId])
+  @@index([projectId])
+  @@index([sharedByUserId])
+  @@index([sharedWithUserId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   // Comment text (markdown supported)
+  resolved  Boolean  @default(false) // Whether the comment/thread is resolved
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testRunId String?  // Optional: link to a specific test run
+  testRun   TestRun? @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  parentId  String?  // For threaded replies
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([testRunId])
+  @@index([parentId])
+  @@index([createdAt])
 }

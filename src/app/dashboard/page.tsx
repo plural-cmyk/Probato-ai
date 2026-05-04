@@ -59,6 +59,8 @@ import {
   Shield,
   Activity,
   BookOpen,
+  Users,
+  Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -99,6 +101,8 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import LiveTestView from "@/components/live-test-view";
 import OnboardingChecklist from "@/components/onboarding-checklist";
+import TeamCollaborationPanel from "@/components/team-collaboration-panel";
+import ShareProjectDialog from "@/components/share-project-dialog";
 
 interface Project {
   id: string;
@@ -481,6 +485,10 @@ export default function DashboardPage() {
     aggregated: { totalCredits: number; avgResponseTime: number; totalRequests: number };
     statusBreakdown: { statusCode: number; count: number }[];
   } | null>(null);
+
+  // Team Collaboration state
+  const [showTeamPanel, setShowTeamPanel] = useState(false);
+  const [shareDialogProject, setShareDialogProject] = useState<{ id: string; name: string } | null>(null);
 
   // Live Test View state
   const [liveTestRunning, setLiveTestRunning] = useState(false);
@@ -1502,6 +1510,16 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Team Collaboration Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowTeamPanel(!showTeamPanel)}
+              title="Team Collaboration"
+            >
+              <Users className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
             {/* API Keys Button */}
             <Button
               variant="ghost"
@@ -3025,6 +3043,15 @@ export default function DashboardPage() {
                         <ExternalLink className="h-3.5 w-3.5 mr-1" />
                         Details
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-electric-violet"
+                        onClick={() => setShareDialogProject({ id: project.id, name: project.repoName })}
+                        title="Share project"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -4127,6 +4154,29 @@ await client.projects.triggerTestRun(projectId);`}</pre>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Team Collaboration Panel */}
+      {showTeamPanel && session?.user?.id && (
+        <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowTeamPanel(false)}>
+          <div
+            className="fixed right-0 top-0 h-full w-full max-w-3xl bg-white shadow-2xl overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <TeamCollaborationPanel
+              onClose={() => setShowTeamPanel(false)}
+              currentUserId={session.user.id}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Share Project Dialog */}
+      <ShareProjectDialog
+        open={!!shareDialogProject}
+        onOpenChange={(open) => { if (!open) setShareDialogProject(null); }}
+        projectId={shareDialogProject?.id ?? ""}
+        projectName={shareDialogProject?.name ?? ""}
+      />
     </div>
   );
 }

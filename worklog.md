@@ -913,3 +913,117 @@ M17: Security & Accessibility Testing   ✅
 M18: Enhanced Landing Page & Onboarding ✅
 M19: Team Collaboration & Test Sharing  🔲
 M20: Test Intelligence Dashboard        🔲
+
+---
+Task ID: 5
+Agent: API Routes Agent
+Task: Create 8 API route files for Team Collaboration, Project Sharing, and Comments
+
+Work Log:
+- Explored project structure: Prisma schema (PostgreSQL), auth config (NextAuth v4 with GitHub), db client
+- Reviewed existing route patterns (projects/route.ts) for consistency
+- Created directory structure for all new route paths
+- Created 8 API route files:
+
+1. /src/app/api/teams/route.ts — Team CRUD
+   - GET: List user's teams with member count, project count, owner info
+   - POST: Create team with slug generation, subscription plan check (team plan required), transaction for Team + TeamMember creation
+
+2. /src/app/api/teams/[id]/route.ts — Team Detail
+   - GET: Get team with members, projects, pending invitations (requires membership)
+   - PATCH: Update team name/description/avatarUrl (requires owner or admin)
+   - DELETE: Delete team with cascade (requires owner only, transaction deletes invitations → members → team)
+
+3. /src/app/api/teams/[id]/members/route.ts — Team Members
+   - GET: List team members with user details (requires membership)
+   - PATCH: Update member role (owner/admin only, can't change owner's role, valid roles: admin/member/viewer)
+   - DELETE: Remove member (owner/admin only, can't remove owner, supports query param or body for userId)
+
+4. /src/app/api/teams/[id]/invitations/route.ts — Team Invitations
+   - POST: Invite user by email (owner/admin only, crypto.randomUUID token, 7-day expiry, member limit check, duplicate/already-member checks)
+   - GET: List pending invitations (requires membership)
+
+5. /src/app/api/teams/invitations/[token]/route.ts — Accept/Decline Invitation
+   - GET: Public preview (no auth required), returns team name, role, inviter name, expiry (no sensitive data)
+   - POST: Accept (creates TeamMember, handles reactivation of removed members) or Decline (requires auth, transaction for accept)
+
+6. /src/app/api/projects/[id]/share/route.ts — Project Sharing
+   - GET: List shared users with permissions (project owner only)
+   - POST: Share project with user by email (owner only, valid permissions: view/edit/admin, upsert for permission updates)
+   - DELETE: Revoke sharing (owner only, userId in body)
+
+7. /src/app/api/comments/route.ts — Comments
+   - GET: List comments for project (optional testRunId filter), includes replies, access check (owner/shared/team member)
+   - POST: Add comment (projectId + content required, optional testRunId + parentId, single-level nesting only)
+
+8. /src/app/api/comments/[id]/route.ts — Comment Detail
+   - PATCH: Update content (author only) or resolved status (author or project owner)
+   - DELETE: Delete comment (author or project owner)
+
+- All routes use consistent patterns: NextRequest/NextResponse, getServerSession(authOptions), db from @/lib/db
+- Proper error handling with try/catch and appropriate HTTP status codes
+- Lint passes with zero errors on all new files
+- Dev server compiles cleanly
+
+Stage Summary:
+- ✅ Task 5 COMPLETE — All 8 API route files created and verified
+- Team collaboration: full CRUD, member management, invitation system with token-based accept/decline
+- Project sharing: share with specific permissions (view/edit/admin), revoke access
+- Comments: threaded comments (1-level nesting), resolve functionality, project/test-run scoping
+- Access control consistently enforced: membership checks for teams, ownership for projects, authorship for comments
+
+---
+Task ID: 6
+Agent: UI Components Agent
+Task: Team Collaboration Panel & Share Project Dialog Components
+
+Work Log:
+- Created /src/components/share-project-dialog.tsx
+  - Reusable dialog for quickly sharing a project from the project list
+  - Props: open, onOpenChange, projectId, projectName, onShared callback
+  - Email input field with validation
+  - Permission select (view/edit/admin) with color-coded badges
+  - "Share" button with loading state
+  - Current shares list with avatar, name, permission badge, revoke button
+  - Uses GET/POST/DELETE /api/projects/[id]/share endpoints
+  - ScrollArea for long share lists, proper error handling
+- Created /src/components/team-collaboration-panel.tsx
+  - Main collaboration panel with 3 tabs: Teams, Sharing, Comments
+  - Props: onClose, currentUserId
+  - Teams Tab:
+    - List user's teams with name, member count, project count, role badge
+    - "Create Team" button that opens a dialog with name + description fields
+    - Click on a team → team detail view with:
+      - Editable team name and description (for owner/admin)
+      - Members list with avatars, names, emails, role badges
+      - Dropdown menu for role changes (admin/member/viewer) and remove member
+      - "Invite Member" dialog with email + role select
+      - Pending invitations list with status
+      - Projects list
+      - Delete Team button (owner only)
+  - Sharing Tab:
+    - Lists owned projects with click-to-select
+    - "Shared with You" section for projects shared with the user
+    - Selected project shows share form (email + permission select)
+    - Current shares list with revoke button
+  - Comments Tab:
+    - Project dropdown selector
+    - Threaded comments with author avatar, name, timestamp
+    - Reply form inline per comment
+    - Resolve/unresolve toggle with visual indicator
+    - Delete comment (for author only)
+    - New comment form at bottom with Ctrl+Enter shortcut
+- Used shadcn/ui components: Card, Tabs, Dialog, Avatar, Badge, Button, Input, Label, Textarea, Select, Separator, ScrollArea, DropdownMenu
+- Used Lucide icons: Users, Share2, MessageSquare, Plus, Trash2, X, ChevronRight, Send, CheckCircle2, Clock, UserPlus, Shield, Eye, Pencil, Loader2, MoreVertical, ArrowLeft
+- Custom color scheme: deep-indigo primary, electric-violet accents, warm-red destructive, emerald success
+- Proper TypeScript interfaces for all data types matching API responses
+- Loading states with Loader2 spinners, error handling with inline messages
+- Optimistic updates where appropriate
+- Both components pass ESLint with zero errors
+
+Stage Summary:
+- ✅ Task 6 COMPLETE — Team Collaboration Panel & Share Project Dialog
+- 2 new component files created
+- Full CRUD integration with team, sharing, and comments API endpoints
+- Responsive design with scroll areas and proper spacing
+- Consistent with existing Probato UI patterns (Card-based, color scheme, icon usage)

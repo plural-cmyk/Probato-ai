@@ -24,6 +24,8 @@ export interface PlanDefinition {
   autoHeal: boolean;
   visualRegression: boolean;
   priorityExecution: boolean;
+  teamCollaboration: boolean; // Whether team features are available
+  maxTeamMembers: number; // 0 = unlimited
   support: string;
   stripePriceId?: string; // Filled when Stripe account is connected
   paystackPlanCode?: string; // Filled when Paystack account is connected
@@ -53,6 +55,8 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     autoHeal: false,
     visualRegression: false,
     priorityExecution: false,
+    teamCollaboration: false,
+    maxTeamMembers: 0,
     support: "community",
   },
   pro: {
@@ -78,6 +82,8 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     autoHeal: true,
     visualRegression: true,
     priorityExecution: false,
+    teamCollaboration: false,
+    maxTeamMembers: 0,
     support: "email",
     popular: true,
   },
@@ -98,6 +104,8 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
       "Auto-heal",
       "Visual regression",
       "Priority execution",
+      "Team collaboration",
+      "Up to 10 team members",
       "Slack support",
     ],
     rollover: true,
@@ -105,6 +113,8 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     autoHeal: true,
     visualRegression: true,
     priorityExecution: true,
+    teamCollaboration: true,
+    maxTeamMembers: 10,
     support: "slack",
   },
   enterprise: {
@@ -123,6 +133,7 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
       "Auto-heal",
       "Visual regression",
       "Priority execution",
+      "Unlimited team members",
       "Dedicated support",
       "Custom integrations",
       "SLA guarantee",
@@ -132,6 +143,8 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     autoHeal: true,
     visualRegression: true,
     priorityExecution: true,
+    teamCollaboration: true,
+    maxTeamMembers: 0,
     support: "dedicated",
   },
 };
@@ -285,7 +298,7 @@ export function getPlanList(): PlanDefinition[] {
   return Object.values(PLANS);
 }
 
-export function isFeatureAvailable(planSlug: PlanSlug, feature: "autoHeal" | "visualRegression" | "priorityExecution"): boolean {
+export function isFeatureAvailable(planSlug: PlanSlug, feature: "autoHeal" | "visualRegression" | "priorityExecution" | "teamCollaboration"): boolean {
   const plan = PLANS[planSlug];
   if (!plan) return false;
   return plan[feature] === true;
