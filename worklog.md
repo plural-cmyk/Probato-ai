@@ -790,3 +790,50 @@ Stage Summary:
 - Integrated with credit system (10 credits), notifications, and existing test results
 - 3 new API routes, 1 new Prisma model, 1 new component
 - 23 new tests
+
+---
+Task ID: 17
+Agent: Main Agent
+Task: M17 — Security & Accessibility Testing Agent
+
+Work Log:
+- Verified all M17 code was already present from previous M16 commit (2c5ac8e)
+- Fixed build failure: removed invalid module-level export of handleGenerateForResult in fix-suggestions-panel.tsx (was a useCallback inside the component, can't be exported at module scope)
+- Ran prisma generate to ensure client is in sync
+- Verified build passes cleanly (69+ routes including 6 new security/a11y routes)
+- Verified all 234 tests pass (32 security-a11y + 23 fix-suggestions + 61 billing + 13 github-app + 38 scheduler + 10 webhook + 30 visual + 27 other)
+- Pushed build fix to GitHub (commit 4bd6ffb)
+
+M17 Features Already Implemented:
+- Security Scanner Agent (src/lib/agent/security-scanner.ts):
+  - HTTP Security Headers check (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
+  - CSP validation (unsafe-inline, unsafe-eval, wildcard script-src, missing default-src)
+  - Mixed content detection (HTTP resources on HTTPS pages)
+  - XSS vector detection (forms without CSRF tokens, inline event handlers, javascript: URIs)
+  - CORS analysis (wildcard origin, credentials with wildcard, multiple origins)
+  - Cookie security (missing HttpOnly flag detection)
+  - 3-tier LLM strategy for additional insights
+  - Score calculation (0-100) with severity-based deductions
+- A11y Auditor Agent (src/lib/agent/a11y-auditor.ts):
+  - Color contrast ratios (WCAG 1.4.3) with relative luminance calculation
+  - ARIA labels and roles (WCAG 4.1.2) for interactive elements
+  - Keyboard navigation (WCAG 2.1.1) — positive tabindex, custom widgets without keyboard handlers
+  - Image alt text (WCAG 1.1.1)
+  - Form labels (WCAG 1.3.1, 3.3.2)
+  - Heading hierarchy (WCAG 1.3.1) — skipped levels, multiple h1s
+  - Focus indicators (WCAG 2.4.7) — outline removal detection
+  - Landmark regions (WCAG 1.3.1) — main, banner, navigation, contentinfo
+  - 3-tier LLM strategy for additional insights
+  - Score calculation (0-100) with severity-based deductions
+- New Prisma Models: SecurityScan, A11yAudit
+- New Action Types (7): checkSecurityHeaders, checkCSP, checkMixedContent, scanA11y, checkContrast, checkAriaLabels, checkKeyboardNav
+- API Routes (6): /api/security/scan, /api/security/scans, /api/security/scans/[id], /api/accessibility/audit, /api/accessibility/audits, /api/accessibility/audits/[id]
+- Credit Integration: security_scan (4 credits), a11y_audit (5 credits)
+- Notification Integration: security_issue, a11y_issue event types
+- UI Components: SecurityScanPanel, A11yAuditPanel on project detail page
+- Tests: 32 tests covering both agents
+
+Stage Summary:
+- M17 (Security & Accessibility Testing Agent) is COMPLETE
+- Build fix pushed (commit 4bd6ffb), Vercel deployment should succeed
+- 69+ API routes, 234 tests, 23 Prisma models
