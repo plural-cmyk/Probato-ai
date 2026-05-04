@@ -1068,3 +1068,29 @@ Stage Summary:
 - 2 new UI components: TeamCollaborationPanel, ShareProjectDialog
 - Dashboard integrated with team button in navbar + share buttons on project cards
 - Plan gating: team features available on Team ($79/mo) and Enterprise plans
+---
+Task ID: 19-fix
+Agent: Main Agent
+Task: Fix client-side application error after onboarding on probato-ai.vercel.app
+
+Work Log:
+- Investigated the 'Application error: a client-side exception has occurred' issue
+- Identified multiple potential causes: unhandled promise rejections, missing error boundaries, API error cascading
+- Added error.tsx for dashboard route (catches rendering errors with user-friendly UI)
+- Added error.tsx for onboarding route (with 'Skip to Dashboard' option)
+- Added global error.tsx at app level (catch-all error boundary)
+- Added loading.tsx for dashboard route (prevents blank screen during navigation)
+- Added Next.js middleware.ts (placeholder for future Edge-compatible auth checks)
+- Fixed unhandled promise rejections in dashboard useEffect:
+  - Added res.ok checks before .json() calls in initial data fetch
+  - Properly catch loadBillingData() errors on mount
+  - Better error handling for browser/check and notifications API calls
+- Build verified - all routes compile cleanly
+- Pushed to GitHub (commit 5f64d8b)
+
+Stage Summary:
+- Error boundaries added at 3 levels: global, dashboard, onboarding
+- Dashboard data fetching made more resilient with proper error handling
+- Next error will show a user-friendly message with the actual error details
+- This makes diagnosing the root cause much easier for future debugging
+
