@@ -33,7 +33,6 @@ import {
   Gauge,
   Lightbulb,
   Loader2,
-  Monitor,
   Pulse,
   RefreshCw,
   Search,

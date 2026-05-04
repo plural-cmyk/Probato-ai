@@ -61,7 +61,6 @@ import {
   BookOpen,
   Users,
   Share2,
-  Monitor,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -2323,7 +2322,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan/10">
-                <Monitor className="h-4 w-4 text-cyan-600" />
+                <Globe className="h-4 w-4 text-cyan-600" />
               </div>
               <div>
                 <CardTitle className="text-base">Live Test View</CardTitle>

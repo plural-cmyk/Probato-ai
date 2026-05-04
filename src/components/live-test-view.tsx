@@ -16,7 +16,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   Play, Square, RotateCcw, CheckCircle2, XCircle, AlertTriangle,
-  SkipForward, Clock, Monitor, ChevronRight, ChevronDown,
+  SkipForward, Clock, ChevronRight, ChevronDown,
   Globe, Terminal, Wifi, Loader2, Camera, Eye, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -111,7 +111,7 @@ function ActionTypeIcon({ type }: { type: string }) {
     case "waitForSelector":
       return <Clock className="w-3.5 h-3.5 text-gray-500" />;
     default:
-      return <Monitor className="w-3.5 h-3.5 text-gray-400" />;
+      return <Globe className="w-3.5 h-3.5 text-gray-400" />;
   }
 }
 
@@ -610,7 +610,7 @@ export default function LiveTestView({ onRunTest, isRunning, onCancel, onComplet
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
-                <Monitor className="w-4 h-4" />
+                <Globe className="w-4 h-4" />
                 Browser View
                 {selectedStepData && (
                   <span className="text-xs text-gray-400 font-normal ml-2">
@@ -686,7 +686,7 @@ export default function LiveTestView({ onRunTest, isRunning, onCancel, onComplet
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                  <Monitor className="w-10 h-10 mb-3" />
+                  <Globe className="w-10 h-10 mb-3" />
                   <p className="text-sm">No screenshot to display</p>
                   <p className="text-xs text-gray-300 mt-1">
                     Run a live test to see browser screenshots in real-time
