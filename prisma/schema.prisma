@@ -78,6 +78,8 @@ model User {
   creditBalance          CreditBalance?
   creditTransactions     CreditTransaction[]
   apiKeys                ApiKey[]
+  securityScans          SecurityScan[]
+  a11yAudits             A11yAudit[]
 }
 
 model Project {
@@ -102,6 +104,8 @@ model Project {
   visualDiffs     VisualDiff[]
   notifications   Notification[]
   fixSuggestions  FixSuggestion[]
+  securityScans   SecurityScan[]
+  a11yAudits      A11yAudit[]
 
   @@index([userId])
 }
@@ -147,6 +151,8 @@ model TestRun {
   visualDiffs VisualDiff[]
   notifications Notification[]
   fixSuggestions FixSuggestion[]
+  securityScans   SecurityScan[]
+  a11yAudits      A11yAudit[]
 
   @@index([projectId])
   @@index([status])
@@ -553,6 +559,73 @@ model FixSuggestion {
   @@index([projectId])
   @@index([status])
   @@index([type])
+  @@index([createdAt])
+}
+
+// ============================================
+// Phase 3: Security & Accessibility Testing
+// ============================================
+
+model SecurityScan {
+  id              String   @id @default(cuid())
+  status          String   @default("pending") // pending, running, completed, failed
+  url             String   // URL that was scanned
+  overallScore    Int      @default(0) // 0-100 security score
+  headersScore    Int      @default(0) // 0-100 headers compliance score
+  cspScore        Int      @default(0) // 0-100 CSP score
+  mixedContentScore Int    @default(0) // 0-100 mixed content score
+  findings        Json     @default("[]") // Array of SecurityFinding objects
+  recommendations Json     @default("[]") // Array of recommendation strings
+  rawHeaders      Json?    // Raw HTTP headers captured
+  llmUsed         Boolean  @default(false)
+  duration        Int      @default(0) // ms
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testRunId       String?
+  testRun         TestRun? @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model A11yAudit {
+  id              String   @id @default(cuid())
+  status          String   @default("pending") // pending, running, completed, failed
+  url             String   // URL that was audited
+  overallScore    Int      @default(0) // 0-100 accessibility score
+  wcagLevel       String   @default("AA") // A, AA, AAA
+  violations      Json     @default("[]") // Array of A11yViolation objects
+  passes          Json     @default("[]") // Array of passing checks
+  incomplete      Json     @default("[]") // Array of incomplete checks
+  recommendations Json     @default("[]") // Array of recommendation strings
+  llmUsed         Boolean  @default(false)
+  duration        Int      @default(0) // ms
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testRunId       String?
+  testRun         TestRun? @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
   @@index([createdAt])
 }
 

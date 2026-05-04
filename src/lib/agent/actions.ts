@@ -25,7 +25,14 @@ export type ActionType =
   | "assertText"
   | "assertVisible"
   | "assertUrl"
-  | "readText";
+  | "readText"
+  | "checkSecurityHeaders"
+  | "checkCSP"
+  | "checkMixedContent"
+  | "scanA11y"
+  | "checkContrast"
+  | "checkAriaLabels"
+  | "checkKeyboardNav";
 
 // ── Selector Strategy ────────────────────────────────────────────
 
@@ -150,6 +157,42 @@ export interface ReadTextAction extends BaseAction {
   selector: Selector;
 }
 
+// ── Security & Accessibility Action Definitions ────────────────────
+
+export interface CheckSecurityHeadersAction extends BaseAction {
+  type: "checkSecurityHeaders";
+}
+
+export interface CheckCSPAction extends BaseAction {
+  type: "checkCSP";
+  url?: string;
+}
+
+export interface CheckMixedContentAction extends BaseAction {
+  type: "checkMixedContent";
+}
+
+export interface ScanA11yAction extends BaseAction {
+  type: "scanA11y";
+  standard?: string; // WCAG version like "2.1AA"
+  level?: string; // A, AA, AAA
+}
+
+export interface CheckContrastAction extends BaseAction {
+  type: "checkContrast";
+  selector?: Selector;
+}
+
+export interface CheckAriaLabelsAction extends BaseAction {
+  type: "checkAriaLabels";
+  selector?: Selector;
+}
+
+export interface CheckKeyboardNavAction extends BaseAction {
+  type: "checkKeyboardNav";
+  maxTabs?: number;
+}
+
 // ── Union Type ──────────────────────────────────────────────────
 
 export type TestAction =
@@ -170,7 +213,14 @@ export type TestAction =
   | AssertTextAction
   | AssertVisibleAction
   | AssertUrlAction
-  | ReadTextAction;
+  | ReadTextAction
+  | CheckSecurityHeadersAction
+  | CheckCSPAction
+  | CheckMixedContentAction
+  | ScanA11yAction
+  | CheckContrastAction
+  | CheckAriaLabelsAction
+  | CheckKeyboardNavAction;
 
 // ── Step Result ─────────────────────────────────────────────────
 

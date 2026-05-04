@@ -145,7 +145,9 @@ export type CreditAction =
   | "visual_compare"
   | "auto_heal"
   | "fix_suggestion"
-  | "screenshot_storage";
+  | "screenshot_storage"
+  | "security_scan"
+  | "a11y_audit";
 
 export interface CreditCostDefinition {
   action: CreditAction;
@@ -204,6 +206,20 @@ export const CREDIT_COSTS: Record<CreditAction, CreditCostDefinition> = {
     unit: "per GB/month",
     description: "Screenshot and baseline storage",
     estimatedCostUsd: 0.02,
+  },
+  security_scan: {
+    action: "security_scan",
+    credits: 4,
+    unit: "per use",
+    description: "Security vulnerability scan (headers, CSP, XSS, mixed content)",
+    estimatedCostUsd: 0.12,
+  },
+  a11y_audit: {
+    action: "a11y_audit",
+    credits: 5,
+    unit: "per use",
+    description: "WCAG accessibility audit (contrast, ARIA, keyboard, forms)",
+    estimatedCostUsd: 0.15,
   },
 };
 

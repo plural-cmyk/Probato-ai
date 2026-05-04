@@ -27,6 +27,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import FixSuggestionsPanel from "@/components/fix-suggestions-panel";
+import SecurityScanPanel from "@/components/security-scan-panel";
+import A11yAuditPanel from "@/components/a11y-audit-panel";
 
 interface Feature {
   id: string;
@@ -102,6 +104,7 @@ export default function ProjectDetailPage() {
   const [generating, setGenerating] = useState(false);
   const [suggestingFixFor, setSuggestingFixFor] = useState<string | null>(null);
   const [fixPanelKey, setFixPanelKey] = useState(0);
+  const [scanPanelKey, setScanPanelKey] = useState(0);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -521,6 +524,20 @@ export default function ProjectDetailPage() {
             key={fixPanelKey}
             projectId={projectId}
             onSuggestionApplied={() => loadProjectData()}
+          />
+        </div>
+
+        {/* Security & Accessibility */}
+        <div className="mt-8 grid gap-8 lg:grid-cols-2">
+          <SecurityScanPanel
+            key={`security-${scanPanelKey}`}
+            projectId={projectId}
+            url={project.sandboxUrl || project.repoUrl}
+          />
+          <A11yAuditPanel
+            key={`a11y-${scanPanelKey}`}
+            projectId={projectId}
+            url={project.sandboxUrl || project.repoUrl}
           />
         </div>
       </main>
