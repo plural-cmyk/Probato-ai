@@ -837,3 +837,79 @@ Stage Summary:
 - M17 (Security & Accessibility Testing Agent) is COMPLETE
 - Build fix pushed (commit 4bd6ffb), Vercel deployment should succeed
 - 69+ API routes, 234 tests, 23 Prisma models
+
+---
+Task ID: 18
+Agent: Main Agent
+Task: M18 — Enhanced Landing Page & Onboarding Flow
+
+Work Log:
+- Added OnboardingState model to Prisma schema (22 total models now)
+  - Fields: currentStep (welcome→connect_repo→discover→first_test→complete), completedSteps[], skipped, repoUrl, projectId, featureCount, testRunId, dismissedAt, completedAt
+  - Unique constraint on userId, indexes on userId and currentStep
+  - Added onboardingState relation to User model
+- Created onboarding API routes:
+  - GET /api/onboarding — fetch or auto-create user's onboarding state
+  - PUT /api/onboarding — update onboarding state (supports skip, dismiss, complete)
+  - POST /api/onboarding/complete-step — mark step as completed with metadata, auto-advance to next step
+- Built multi-step onboarding wizard page (/onboarding):
+  - Step 1: Welcome — feature highlights, "Get Started" and "Skip for now" buttons
+  - Step 2: Connect Repository — GitHub repo URL input + branch, creates project via API
+  - Step 3: Discover Features — auto-triggers feature discovery, shows animated loading state
+  - Step 4: Run First Test — URL input, preset selector, runs test via API
+  - Step 5: Complete — summary of accomplishments, "Go to Dashboard" button
+  - Framer Motion AnimatePresence step transitions with directional sliding
+  - Progress indicator with numbered circles and step labels
+  - Auth guard redirects unauthenticated users
+  - Already-onboarded users auto-redirected to /dashboard
+- Enhanced landing page (src/app/page.tsx):
+  - Mobile hamburger menu with AnimatePresence transitions
+  - Animated terminal typing effect in hero section
+  - Trust badges ("Trusted by 500+ developers", "4.9/5 avg rating", "<2 min setup")
+  - Social proof bar with company name badges
+  - 9 feature cards (added Security Scanning, Accessibility Auditing, Visual Regression)
+  - NEW: Pricing section with Free ($0/mo), Pro ($29/mo, "Most Popular"), Team ($79/mo) tiers
+  - NEW: FAQ accordion section with 5 questions and detailed answers
+  - Enhanced footer with 5-column layout (Brand, Product, Company, Legal, Community)
+  - All CTAs now redirect to /onboarding instead of /dashboard
+- Created OnboardingChecklist component for dashboard:
+  - Shows 3-step progress checklist (Connect Repo, Discover Features, Run First Test)
+  - Progress bar with step completion count
+  - Auto-hides when onboarding is complete, skipped, or dismissed
+  - Dismiss button with server-side state persistence
+  - Color-coded steps (emerald completed, electric-violet current, gray pending)
+- Updated sign-in page to redirect to /onboarding instead of /dashboard
+- Wrote 46 onboarding tests covering:
+  - Step progression (5 steps, correct order, validation)
+  - Step advancement logic (next step calculation, null after complete)
+  - Completed steps tracking (add, deduplicate, preserve order)
+  - Completion detection (required steps, percentage calculation)
+  - Repo name extraction (HTTPS, SSH, .git suffix, edge cases)
+  - State defaults (all default values verified)
+  - State transitions (full flow with metadata, step-specific data saving)
+  - Skip/dismiss logic (dismissedAt setting, re-enable clearing, visibility determination)
+  - Full flow integration (complete flow, partial flow, progress tracking)
+- All 280 tests passing across 9 test files
+- Build passes cleanly
+- Pushed to GitHub (commit 7a141f6)
+
+Stage Summary:
+- M18 (Enhanced Landing Page & Onboarding Flow) is COMPLETE
+- New page: /onboarding — 5-step wizard with Framer Motion animations
+- New API routes: GET/PUT /api/onboarding, POST /api/onboarding/complete-step
+- Enhanced landing page: pricing, FAQ, social proof, 9 features, mobile menu
+- OnboardingChecklist dashboard component with dismiss functionality
+- New users now flow: Sign In → Onboarding Wizard → Dashboard
+- 1 new Prisma model: OnboardingState
+- 46 new tests (280 total)
+- 12 files changed, 2891 insertions
+
+═══════════════════════════════════════════════════════
+PHASE 3 PROGRESS
+═══════════════════════════════════════════════════════
+M15: Live Test Execution View           ✅
+M16: Fix Suggestion & Approval Workflow ✅
+M17: Security & Accessibility Testing   ✅
+M18: Enhanced Landing Page & Onboarding ✅
+M19: Team Collaboration & Test Sharing  🔲
+M20: Test Intelligence Dashboard        🔲
