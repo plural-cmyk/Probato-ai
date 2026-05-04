@@ -80,6 +80,7 @@ model User {
   apiKeys                ApiKey[]
   securityScans          SecurityScan[]
   a11yAudits             A11yAudit[]
+  onboardingState        OnboardingState?
 }
 
 model Project {
@@ -680,4 +681,29 @@ model ApiUsage {
   @@index([endpoint])
   @@index([createdAt])
   @@index([statusCode])
+}
+
+// ============================================
+// Phase 3: Onboarding State
+// ============================================
+
+model OnboardingState {
+  id              String   @id @default(cuid())
+  currentStep     String   @default("welcome") // welcome, connect_repo, discover, first_test, complete
+  completedSteps  String[] @default([])
+  skipped         Boolean  @default(false)
+  repoUrl         String?  // Repo URL entered during onboarding
+  projectId       String?  // Project created during onboarding
+  featureCount    Int      @default(0)
+  testRunId       String?  // First test run from onboarding
+  dismissedAt     DateTime? // When user dismissed/skipped onboarding
+  completedAt     DateTime? // When user completed all onboarding steps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([currentStep])
 }

@@ -50,7 +50,7 @@ export default function SignInPage() {
             {Object.values(providers).map((provider) => (
               <Button
                 key={provider.id}
-                onClick={() => signIn(provider.id, { callbackUrl: "/dashboard" })}
+                onClick={() => signIn(provider.id, { callbackUrl: "/onboarding" })}
                 className="w-full h-12 text-base bg-deep-indigo hover:bg-deep-indigo/90 text-white"
                 size="lg"
               >
@@ -62,7 +62,7 @@ export default function SignInPage() {
             {/* Fallback if providers haven't loaded yet */}
             {Object.keys(providers).length === 0 && (
               <Button
-                onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
+                onClick={() => signIn("github", { callbackUrl: "/onboarding" })}
                 className="w-full h-12 text-base bg-deep-indigo hover:bg-deep-indigo/90 text-white"
                 size="lg"
               >

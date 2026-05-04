@@ -98,6 +98,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import LiveTestView from "@/components/live-test-view";
+import OnboardingChecklist from "@/components/onboarding-checklist";
 
 interface Project {
   id: string;
@@ -1903,6 +1904,9 @@ export default function DashboardPage() {
             </p>
           </div>
         )}
+
+        {/* Onboarding Checklist */}
+        <OnboardingChecklist />
 
         {/* Quick Stats */}
         <div className="mb-8 grid gap-4 sm:grid-cols-4">
