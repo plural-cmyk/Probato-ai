@@ -164,7 +164,8 @@ export type CreditAction =
   | "api_probe"
   | "a11y_audit"
   | "media_verification"
-  | "orchestrated_test";
+  | "orchestrated_test"
+  | "messaging_test";
 
 export interface CreditCostDefinition {
   action: CreditAction;
@@ -264,6 +265,13 @@ export const CREDIT_COSTS: Record<CreditAction, CreditCostDefinition> = {
     credits: 12,
     unit: "per session",
     description: "Multi-device orchestrated test (2+ browser agents with sync coordination)",
+    estimatedCostUsd: 0.40,
+  },
+  messaging_test: {
+    action: "messaging_test",
+    credits: 12,
+    unit: "per session",
+    description: "Cross-device messaging & notification test (sender/receiver agents with delivery verification)",
     estimatedCostUsd: 0.40,
   },
 };

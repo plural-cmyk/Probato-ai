@@ -499,7 +499,19 @@ async function executeAction(
       return { evidence: `Signal received: ${JSON.stringify(event?.payload ?? {})}` };
     }
     case "custom": {
-      // Custom actions are no-ops for now — M26/M27/M28 will define concrete actions
+      // Delegate messaging-specific custom actions to M26 handler
+      if (["send_message", "verify_message_received", "check_notification_badge",
+           "wait_for_notification", "dismiss_notification", "verify_delivery_receipt",
+           "verify_typing_indicator", "open_conversation", "verify_online_status",
+           "check_push_notification"].includes(action.value ?? "")) {
+        try {
+          const { handleMessagingCustomAction } = await import("@/lib/agent/messaging-tester");
+          return await handleMessagingCustomAction(page, action, sessionId, agentRole, syncTimeoutMs);
+        } catch (err: unknown) {
+          return { evidence: `Messaging action fallback: ${action.value} — ${err instanceof Error ? err.message : String(err)}` };
+        }
+      }
+      // Generic custom action fallback for M27/M28
       return { evidence: `Custom action: ${action.description ?? action.value ?? "undefined"}` };
     }
     default: {

@@ -84,6 +84,7 @@ model User {
   a11yAudits             A11yAudit[]
   mediaVerifications     MediaVerification[]
   orchestratedSessions   OrchestratedSession[]
+  messagingTestSessions  MessagingTestSession[]
   onboardingState        OnboardingState?
   teamMemberships        TeamMember[]
   sentInvitations        TeamInvitation[]  @relation("SentInvitations")
@@ -126,6 +127,7 @@ model Project {
   a11yAudits      A11yAudit[]
   mediaVerifications MediaVerification[]
   orchestratedSessions OrchestratedSession[]
+  messagingTestSessions MessagingTestSession[]
   comments        Comment[]
   sharedWith      SharedProject[]
 
@@ -181,6 +183,7 @@ model TestRun {
   a11yAudits      A11yAudit[]
   mediaVerifications MediaVerification[]
   orchestratedSessions OrchestratedSession[]
+  messagingTestSessions MessagingTestSession[]
   comments        Comment[]
 
   @@index([projectId])
@@ -1021,6 +1024,7 @@ model OrchestratedSession {
 
   sandboxes       SandboxInstance[]
   syncEvents      SyncEvent[]
+  messagingTest   MessagingTestSession?
 
   @@index([userId])
   @@index([projectId])
@@ -1068,4 +1072,51 @@ model SyncEvent {
   @@index([sessionId, eventType])
   @@index([sessionId, targetAgent, consumed])
   @@index([consumed])
+}
+
+// ============================================
+// Phase 5: Cross-Device Messaging Testing (M26)
+// ============================================
+
+model MessagingTestSession {
+  id                  String    @id @default(cuid())
+  status              String    @default("pending")  // pending, running, completed, failed
+  url                 String    // Target URL for the messaging app
+  testMessage         String    @default("PROBATO_TEST_MSG_2024") // Benign marker string used for testing
+  messageDeliveryMs   Int       @default(0)           // Message delivery latency in ms
+  notificationDeliveryMs Int    @default(0)           // Notification delivery latency in ms
+  conversationFlow    Json      @default("[]")        // Ordered array of conversation events
+  messageChecks       Json      @default("[]")        // Array of MessageCheckResult objects
+  notificationChecks  Json      @default("[]")        // Array of NotificationCheckResult objects
+  deliveryChecks      Json      @default("[]")        // Array of DeliveryCheckResult objects
+  overallScore        Int       @default(0)           // 0-100 messaging health score
+  messageScore        Int       @default(0)           // 0-100 message delivery score
+  notificationScore   Int       @default(0)           // 0-100 notification score
+  deliveryScore       Int       @default(0)           // 0-100 delivery receipt score
+  findings            Json      @default("[]")        // Aggregated findings
+  recommendations     Json      @default("[]")        // Array of recommendation strings
+  llmUsed             Boolean   @default(false)
+  duration            Int       @default(0)           // Total test duration in ms
+  error               String?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  projectId           String?
+  project             Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testRunId           String?
+  testRun             TestRun?  @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  orchestratedSessionId String?  @unique
+  orchestratedSession   OrchestratedSession? @relation(fields: [orchestratedSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
 }

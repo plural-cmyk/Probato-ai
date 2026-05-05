@@ -32,6 +32,7 @@ import SecurityProbePanel from "@/components/security-probe-panel";
 import APIProbePanel from "@/components/api-probe-panel";
 import A11yAuditPanel from "@/components/a11y-audit-panel";
 import OrchestratorPanel from "@/components/orchestrator-panel";
+import MessagingTestPanel from "@/components/messaging-test-panel";
 
 interface Feature {
   id: string;
@@ -561,6 +562,14 @@ export default function ProjectDetailPage() {
         {/* Multi-Device Orchestrator */}
         <div className="mt-8">
           <OrchestratorPanel
+            projectId={projectId}
+            url={project.sandboxUrl || project.repoUrl}
+          />
+        </div>
+
+        {/* Cross-Device Messaging Test */}
+        <div className="mt-8">
+          <MessagingTestPanel
             projectId={projectId}
             url={project.sandboxUrl || project.repoUrl}
           />
