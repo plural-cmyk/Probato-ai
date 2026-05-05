@@ -1371,3 +1371,37 @@ Stage Summary:
 - Build: clean compilation
 - All 381 total tests passing across 10 test files
 - Pushed as commit a6dc565 to main branch
+---
+Task ID: 27
+Agent: Main Agent
+Task: M27 - Call Flow Testing
+
+Work Log:
+- Added CallFlowTestSession Prisma model with call-specific fields (ringLatencyMs, connectionLatencyMs, callDurationMs, callType, connectionScore, audioScore, callFlowScore)
+- Added callFlowTestSessions relations to User, Project, TestRun models
+- Added callFlowTest relation to OrchestratedSession model
+- Built src/lib/agent/call-flow-tester.ts (1,716 lines) with:
+  - 13 call action handlers: dial, answer, hangup, verify_ring, verify_incoming_call, verify_call_connected, verify_call_ended, verify_call_timer, verify_call_quality, verify_audio_indicator, toggle_mute, toggle_speaker, toggle_video
+  - 2-agent configuration: caller (dial→verify→mute→hangup) and callee (incoming→answer→speaker)
+  - Scoring: connectionScore×0.4 + audioScore×0.3 + callFlowScore×0.3
+  - 3-tier LLM analysis (z-ai → external → rule-based)
+  - Credit integration: 12 credits per call_flow_test action
+  - DB-backed CallFlowTestSession persistence
+- Created 2 API routes:
+  - POST/GET /api/orchestrator/call-flow (run test + list sessions)
+  - GET /api/orchestrator/call-flow/[id] (session detail with orchestratedSession, sandboxes, syncEvents)
+- Integrated 13 call flow actions into multi-device-orchestrator.ts custom action handler
+- Added call_flow_test credit action to billing/plans.ts (12 credits, $0.40/session)
+- Wrote 127 tests covering all action handlers, scoring, analysis, latency, credits, edge cases
+- All 508 tests passing across 11 test files
+- Build compiles cleanly
+- Pushed as commit 4175f2b to main branch
+
+Stage Summary:
+- M27 (Call Flow Testing) is COMPLETE
+- 7 files changed, 4,462 insertions
+- New Prisma model: CallFlowTestSession
+- New credit action: call_flow_test (12 credits)
+- 2 new API routes under /api/orchestrator/call-flow/
+- 13 call-specific action handlers integrated with M25 orchestrator
+- Phase 5 progress: 3/4 milestones (M25✅ M26✅ M27✅ M28 remaining)
