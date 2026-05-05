@@ -80,6 +80,7 @@ model User {
   apiKeys                ApiKey[]
   securityScans          SecurityScan[]
   a11yAudits             A11yAudit[]
+  mediaVerifications     MediaVerification[]
   onboardingState        OnboardingState?
   teamMemberships        TeamMember[]
   sentInvitations        TeamInvitation[]  @relation("SentInvitations")
@@ -118,6 +119,7 @@ model Project {
   fixSuggestions  FixSuggestion[]
   securityScans   SecurityScan[]
   a11yAudits      A11yAudit[]
+  mediaVerifications MediaVerification[]
   comments        Comment[]
   sharedWith      SharedProject[]
 
@@ -169,6 +171,7 @@ model TestRun {
   fixSuggestions FixSuggestion[]
   securityScans   SecurityScan[]
   a11yAudits      A11yAudit[]
+  mediaVerifications MediaVerification[]
   comments        Comment[]
 
   @@index([projectId])
@@ -613,6 +616,38 @@ model SecurityScan {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+}
+
+model MediaVerification {
+  id              String   @id @default(cuid())
+  status          String   @default("pending") // pending, running, completed, failed
+  url             String   // URL that was verified
+  overallScore    Int      @default(0) // 0-100 media health score
+  imageScore      Int      @default(0) // 0-100 image health score
+  videoScore      Int      @default(0) // 0-100 video health score
+  audioScore      Int      @default(0) // 0-100 audio health score (reserved for M22)
+  imageChecks     Json     @default("[]") // Array of ImageCheckResult objects
+  videoChecks     Json     @default("[]") // Array of VideoCheckResult objects
+  audioChecks     Json     @default("[]") // Array of AudioCheckResult objects (reserved for M22)
+  summary         Json     @default("{}") // Summary statistics
+  llmUsed         Boolean  @default(false)
+  duration        Int      @default(0) // ms
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testRunId       String?
+  testRun         TestRun? @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
 }
 
 model A11yAudit {

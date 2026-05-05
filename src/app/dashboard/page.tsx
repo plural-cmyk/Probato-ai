@@ -104,6 +104,7 @@ import OnboardingChecklist from "@/components/onboarding-checklist";
 import TeamCollaborationPanel from "@/components/team-collaboration-panel";
 import ShareProjectDialog from "@/components/share-project-dialog";
 import TestIntelligencePanel from "@/components/test-intelligence-panel";
+import MediaVerificationPanel from "@/components/media-verification-panel";
 
 interface Project {
   id: string;
@@ -1946,6 +1947,29 @@ export default function DashboardPage() {
 
         {/* Onboarding Checklist */}
         <OnboardingChecklist />
+
+        {/* Media Verification Section (M21) */}
+        <Card className="mb-8 border-border/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10">
+                <Camera className="h-4 w-4 text-rose-600" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Media Verification</CardTitle>
+                <CardDescription className="text-xs">
+                  Check images and videos for broken sources, display issues, and playback errors
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <MediaVerificationPanel
+              url={browseUrl || "https://example.com"}
+              projectId={selectedProject?.id}
+            />
+          </CardContent>
+        </Card>
 
         {/* Test Intelligence Dashboard (M20) */}
         {showIntelligencePanel && (
