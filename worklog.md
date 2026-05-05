@@ -1211,3 +1211,30 @@ M21: Media Verification (Image + Video)  ✅
 M22: Audio Verification + Whisper        🔲
 M23: Active Security v1 (XSS + Auth)     🔲
 M24: Active Security v2 (API + IDOR)     🔲
+
+---
+Task ID: M22
+Agent: main
+Task: Implement Audio Verification & Whisper Integration (M22)
+
+Work Log:
+- Added AudioCheckResult interface with status, readyState, duration, volume, muted, error, format, networkState, cssHidden, transcription, transcriptionConfidence, transcriptionError fields
+- Implemented performAudioChecks() function with comprehensive <audio> element analysis
+- Added detection for embedded audio: <embed>/<object> with audio type, iframe-based players (SoundCloud, Spotify, Podbean, Buzzsprout, AudioBoom)
+- Implemented Whisper transcription with 3-tier strategy: z-ai ASR → external Whisper API → LLM fallback
+- Added audio source URL collection for transcription candidates
+- Added empty transcription detection (flags silent audio as medium severity)
+- Updated MediaVerificationInput with checkAudio, transcribeAudio, maxTranscriptions options
+- Updated MediaVerificationResult with audioChecks array, audioScore, and audio summary fields
+- Updated LLM analysis prompt and parser to include audio findings
+- Updated API route POST /api/media/verify with audio verification options
+- Updated media-verification-panel.tsx with Audio tab, AudioCheckCard, Transcribe toggle, audio summary grid
+- Added media_verification credit action (4 credits) to billing plans
+- Updated credit deduction from security_scan placeholder to media_verification
+- Committed as 21fb289 and pushed to main
+
+Stage Summary:
+- M22 Audio Verification & Whisper Integration: COMPLETE
+- Phase 4 progress: 2/4 milestones done (M21 ✅, M22 ✅, M23 🔲, M24 🔲)
+- Key files modified: media-verifier.ts, media/verify/route.ts, media-verification-panel.tsx, plans.ts
+- No new Prisma migration needed (audioScore and audioChecks fields already existed)
