@@ -161,6 +161,7 @@ export type CreditAction =
   | "screenshot_storage"
   | "security_scan"
   | "security_probe"
+  | "api_probe"
   | "a11y_audit"
   | "media_verification";
 
@@ -249,6 +250,13 @@ export const CREDIT_COSTS: Record<CreditAction, CreditCostDefinition> = {
     unit: "per use",
     description: "Active security probing (XSS injection testing, auth flow analysis)",
     estimatedCostUsd: 0.20,
+  },
+  api_probe: {
+    action: "api_probe",
+    credits: 8,
+    unit: "per use",
+    description: "API security probing (endpoint discovery, CSRF, rate limiting, IDOR testing)",
+    estimatedCostUsd: 0.25,
   },
 };
 

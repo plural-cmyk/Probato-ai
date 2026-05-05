@@ -80,6 +80,7 @@ model User {
   apiKeys                ApiKey[]
   securityScans          SecurityScan[]
   securityProbes         SecurityProbe[]
+  apiProbes              APIProbe[]
   a11yAudits             A11yAudit[]
   mediaVerifications     MediaVerification[]
   onboardingState        OnboardingState?
@@ -120,6 +121,7 @@ model Project {
   fixSuggestions  FixSuggestion[]
   securityScans   SecurityScan[]
   securityProbes  SecurityProbe[]
+  apiProbes       APIProbe[]
   a11yAudits      A11yAudit[]
   mediaVerifications MediaVerification[]
   comments        Comment[]
@@ -173,6 +175,7 @@ model TestRun {
   fixSuggestions FixSuggestion[]
   securityScans   SecurityScan[]
   securityProbes  SecurityProbe[]
+  apiProbes       APIProbe[]
   a11yAudits      A11yAudit[]
   mediaVerifications MediaVerification[]
   comments        Comment[]
@@ -664,6 +667,42 @@ model SecurityProbe {
   authFindings    Json     @default("[]") // Array of AuthProbeFinding objects
   payloadsTested  Json     @default("[]") // XSS payloads that were tested
   authEndpoints   Json     @default("[]") // Auth endpoints that were probed
+  recommendations Json     @default("[]") // Array of recommendation strings
+  llmUsed         Boolean  @default(false)
+  duration        Int      @default(0) // ms
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testRunId       String?
+  testRun         TestRun? @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model APIProbe {
+  id              String   @id @default(cuid())
+  status          String   @default("pending") // pending, running, completed, failed
+  url             String   // Base URL that was probed
+  overallScore    Int      @default(0) // 0-100 API security score
+  apiSecurityScore Int     @default(0) // 0-100 API endpoint security score
+  csrfScore       Int      @default(0) // 0-100 CSRF protection score
+  rateLimitScore  Int      @default(0) // 0-100 rate limiting score
+  idorScore       Int      @default(0) // 0-100 IDOR protection score
+  apiFindings     Json     @default("[]") // Array of APISecurityFinding objects
+  csrfFindings    Json     @default("[]") // Array of CSRFFinding objects
+  rateLimitFindings Json   @default("[]") // Array of RateLimitFinding objects
+  idorFindings    Json     @default("[]") // Array of IDORFinding objects
+  endpoints       Json     @default("[]") // Discovered API endpoints
   recommendations Json     @default("[]") // Array of recommendation strings
   llmUsed         Boolean  @default(false)
   duration        Int      @default(0) // ms

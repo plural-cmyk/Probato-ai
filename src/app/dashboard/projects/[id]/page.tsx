@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import FixSuggestionsPanel from "@/components/fix-suggestions-panel";
 import SecurityScanPanel from "@/components/security-scan-panel";
 import SecurityProbePanel from "@/components/security-probe-panel";
+import APIProbePanel from "@/components/api-probe-panel";
 import A11yAuditPanel from "@/components/a11y-audit-panel";
 
 interface Feature {
@@ -528,7 +529,7 @@ export default function ProjectDetailPage() {
           />
         </div>
 
-        {/* Security & Accessibility */}
+        {/* Security */}
         <div className="mt-8 grid gap-8 lg:grid-cols-2">
           <SecurityScanPanel
             key={`security-${scanPanelKey}`}
@@ -542,8 +543,13 @@ export default function ProjectDetailPage() {
           />
         </div>
 
-        {/* Accessibility */}
-        <div className="mt-8">
+        {/* API Security & Accessibility */}
+        <div className="mt-8 grid gap-8 lg:grid-cols-2">
+          <APIProbePanel
+            key={`api-probe-${scanPanelKey}`}
+            projectId={projectId}
+            url={project.sandboxUrl || project.repoUrl}
+          />
           <A11yAuditPanel
             key={`a11y-${scanPanelKey}`}
             projectId={projectId}
