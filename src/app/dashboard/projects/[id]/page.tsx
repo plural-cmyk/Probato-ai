@@ -28,6 +28,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import FixSuggestionsPanel from "@/components/fix-suggestions-panel";
 import SecurityScanPanel from "@/components/security-scan-panel";
+import SecurityProbePanel from "@/components/security-probe-panel";
 import A11yAuditPanel from "@/components/a11y-audit-panel";
 
 interface Feature {
@@ -534,6 +535,15 @@ export default function ProjectDetailPage() {
             projectId={projectId}
             url={project.sandboxUrl || project.repoUrl}
           />
+          <SecurityProbePanel
+            key={`probe-${scanPanelKey}`}
+            projectId={projectId}
+            url={project.sandboxUrl || project.repoUrl}
+          />
+        </div>
+
+        {/* Accessibility */}
+        <div className="mt-8">
           <A11yAuditPanel
             key={`a11y-${scanPanelKey}`}
             projectId={projectId}

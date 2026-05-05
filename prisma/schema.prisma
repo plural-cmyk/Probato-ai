@@ -79,6 +79,7 @@ model User {
   creditTransactions     CreditTransaction[]
   apiKeys                ApiKey[]
   securityScans          SecurityScan[]
+  securityProbes         SecurityProbe[]
   a11yAudits             A11yAudit[]
   mediaVerifications     MediaVerification[]
   onboardingState        OnboardingState?
@@ -118,6 +119,7 @@ model Project {
   notifications   Notification[]
   fixSuggestions  FixSuggestion[]
   securityScans   SecurityScan[]
+  securityProbes  SecurityProbe[]
   a11yAudits      A11yAudit[]
   mediaVerifications MediaVerification[]
   comments        Comment[]
@@ -170,6 +172,7 @@ model TestRun {
   notifications Notification[]
   fixSuggestions FixSuggestion[]
   securityScans   SecurityScan[]
+  securityProbes  SecurityProbe[]
   a11yAudits      A11yAudit[]
   mediaVerifications MediaVerification[]
   comments        Comment[]
@@ -648,6 +651,39 @@ model MediaVerification {
   @@index([userId])
   @@index([projectId])
   @@index([status])
+}
+
+model SecurityProbe {
+  id              String   @id @default(cuid())
+  status          String   @default("pending") // pending, running, completed, failed
+  url             String   // URL that was probed
+  overallScore    Int      @default(0) // 0-100 security probe score
+  xssScore        Int      @default(0) // 0-100 XSS resistance score
+  authScore       Int      @default(0) // 0-100 auth security score
+  xssFindings     Json     @default("[]") // Array of XSSProbeFinding objects
+  authFindings    Json     @default("[]") // Array of AuthProbeFinding objects
+  payloadsTested  Json     @default("[]") // XSS payloads that were tested
+  authEndpoints   Json     @default("[]") // Auth endpoints that were probed
+  recommendations Json     @default("[]") // Array of recommendation strings
+  llmUsed         Boolean  @default(false)
+  duration        Int      @default(0) // ms
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testRunId       String?
+  testRun         TestRun? @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model A11yAudit {

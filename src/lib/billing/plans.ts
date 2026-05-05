@@ -160,6 +160,7 @@ export type CreditAction =
   | "fix_suggestion"
   | "screenshot_storage"
   | "security_scan"
+  | "security_probe"
   | "a11y_audit"
   | "media_verification";
 
@@ -241,6 +242,13 @@ export const CREDIT_COSTS: Record<CreditAction, CreditCostDefinition> = {
     unit: "per use",
     description: "Media verification (images, video, audio health + Whisper transcription)",
     estimatedCostUsd: 0.14,
+  },
+  security_probe: {
+    action: "security_probe",
+    credits: 6,
+    unit: "per use",
+    description: "Active security probing (XSS injection testing, auth flow analysis)",
+    estimatedCostUsd: 0.20,
   },
 };
 
