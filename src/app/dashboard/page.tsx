@@ -61,6 +61,8 @@ import {
   BookOpen,
   Users,
   Share2,
+  BarChart3,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
