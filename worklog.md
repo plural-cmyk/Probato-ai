@@ -1275,3 +1275,37 @@ Stage Summary:
 - 8 files changed, 2721 insertions
 - New routes: /api/security/probe, /api/security/probes, /api/security/probes/[id]
 - Phase 4 progress: M21✅ M22✅ M23✅ M24⏳
+
+---
+Task ID: M24
+Agent: main
+Task: Implement Active Security Agent v2 (API Security, CSRF, Rate Limiting, IDOR)
+
+Work Log:
+- Added APIProbe Prisma model with apiSecurityScore, csrfScore, rateLimitScore, idorScore, apiFindings, csrfFindings, rateLimitFindings, idorFindings, endpoints
+- Added apiProbe relations to User, Project, and TestRun models
+- Added "api_probe" CreditAction (8 credits/use) to plans.ts
+- Created src/lib/agent/api-prober.ts (~700 lines) with:
+  - API endpoint discovery: page crawling (links, forms, fetch/XHR/axios), common API patterns (/api/, /v1/, /graphql), OpenAPI/swagger detection
+  - API security: missing authentication on sensitive endpoints, verbose error messages (stack traces, SQL errors, framework disclosure), HTTP method tampering, CORS misconfiguration (wildcard + credentials), information disclosure headers
+  - CSRF testing: missing token on state-changing endpoints, Origin header validation, GET-based state changes, SameSite cookie attribute
+  - Rate limiting: endpoint-level rate limit detection (8-20 rapid requests), auth-specific rate limiting, weak rate limit thresholds
+  - IDOR: sequential ID detection, cross-ID access testing (ID+1), mass assignment (admin field injection), exposed list endpoints
+  - 3-tier LLM strategy for additional findings
+  - Probe depth options: quick/standard/deep
+  - Full credit check/deduct, notification dispatch, DB persistence
+- Created API routes: POST /api/security/api-probe, GET /api/security/api-probes, GET /api/security/api-probes/[id]
+- Created api-probe-panel.tsx with:
+  - 5 score circles (Overall, API, CSRF, Rate Limit, IDOR)
+  - 5-tab category filter (All, API, CSRF, Rate, IDOR)
+  - Depth selector (quick/standard/deep)
+  - Expandable finding cards with endpoint/method/evidence
+  - Recommendations, probe history
+- Reorganized project detail page: Security (2-col: Scan + Probe), API Security & A11y (2-col: API Probe + A11y)
+- Build: zero errors, all new routes confirmed
+- Pushed to main: commit c95d1e0
+
+Stage Summary:
+- M24 complete: Active Security Agent v2 with API Security, CSRF, Rate Limiting, IDOR
+- 8 files changed, 1903 insertions
+- Phase 4 COMPLETE: M21✅ M22✅ M23✅ M24✅
