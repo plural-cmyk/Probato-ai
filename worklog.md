@@ -1560,3 +1560,118 @@ Stage Summary:
 - RBAC with 5 default policies + custom policy creation + permission check tool
 - 3 dashboard panels: SSO Config, Audit Log, RBAC
 - All new code properly typed with TypeScript
+
+---
+Task ID: 33
+Agent: Main Agent
+Task: M33 — Plugin Architecture & Integrations Marketplace
+
+Work Log:
+- Added 4 new Prisma models: Plugin, PluginExecution, MarketplaceListing, MarketplaceReview
+  - Plugin: name (npm-style), version, description, manifest, extensionPoints, permissions, tier (official/verified/community), status (installed/active/deactivated/error), config, checksum, signature, executionCount, lastExecutedAt, lastError, isPrivate
+  - PluginExecution: extensionPoint, input/output, durationMs, memoryUsedKb, cpuTimeMs, status (completed/error/timeout/killed), error, triggeredBy
+  - MarketplaceListing: name, version, description, author, category (integration/test_runner/notification/analytics/utility), tier, tags, installCount, avgRating, reviewCount, requiredPermissions, extensionPoints, configSchema, packageUrl, checksum, signature, featured
+  - MarketplaceReview: rating (1-5), title, content, version, userId, userName
+  - Unique constraints: Plugin(teamId, name), MarketplaceListing(name), MarketplaceReview(listingId, userId)
+  - Added `plugins Plugin[]` relation to Team model
+  - Added `marketplaceReviews MarketplaceReview[]` relation to User model
+  - Added `user User` back-relation to MarketplaceReview
+- Created Plugin Management API routes (6 routes):
+  - GET/POST /api/plugins — list installed plugins for team / install new plugin
+  - GET/PATCH/DELETE /api/plugins/[id] — get/update/uninstall a plugin
+  - POST /api/plugins/[id]/configure — update plugin configuration
+  - POST /api/plugins/[id]/activate — activate a plugin (enabled=true, status=active)
+  - POST /api/plugins/[id]/deactivate — deactivate a plugin (enabled=false, status=deactivated)
+  - GET /api/plugins/[id]/executions — list execution history with pagination
+- Created Marketplace API routes (4 routes):
+  - GET /api/marketplace — browse listings with filters (category, tier, search, sort)
+  - GET /api/marketplace/[id] — listing details with recent reviews
+  - POST /api/marketplace/[id]/install — install marketplace plugin (creates Plugin record, increments install count)
+  - GET/POST /api/marketplace/[id]/reviews — list reviews / submit review (1-5 stars, recalculates avg rating)
+- Created PluginManagementPanel component (src/components/plugin-management-panel.tsx):
+  - Lists installed plugins with status icon, tier badge, version badge, last executed time
+  - Install Plugin form: name, version, description, author, tier
+  - Per-plugin actions: Activate/Deactivate toggle switch, Configure (JSON editor), View Executions, Uninstall
+  - Execution history table: extension point, duration, memory, status, timestamp
+  - Auto-fetches user's first team for team-scoped plugin management
+  - Config editor with JSON validation and save
+- Created MarketplacePanel component (src/components/marketplace-panel.tsx):
+  - Browse marketplace in card grid layout (2 columns)
+  - Filter by category (integration, test_runner, notification, analytics, utility) and tier (official, verified, community)
+  - Search by name/description
+  - Each card shows: name with category emoji, description, author, tier badge, install count, avg rating (stars), tags
+  - Expandable details: long description, homepage/repository links, required permissions, extension points
+  - Install button that calls /api/marketplace/[id]/install
+  - Review section with star ratings (1-5 interactive), review title/content form
+  - Featured badge for promoted plugins
+  - Sorting by recent, popular, rating, name
+- Integrated M33 panels into dashboard:
+  - Added Box (Plugin Management) and Store (Marketplace) buttons in nav toolbar
+  - Added state variables: showPluginPanel, showMarketplacePanel
+  - Added panel rendering sections for PluginManagementPanel and MarketplacePanel
+  - Added Box and Store to lucide-react imports
+- Prisma client generated successfully — schema validates cleanly
+- All new M33 files pass ESLint with zero errors
+- Audit logging integrated on all mutation endpoints (plugin install/uninstall/activate/deactivate/configure, marketplace install/review)
+
+Stage Summary:
+- ✅ Milestone 33 COMPLETE — Plugin Architecture & Integrations Marketplace
+- 4 new Prisma models: Plugin, PluginExecution, MarketplaceListing, MarketplaceReview
+- 10 new API routes: 6 Plugin Management + 4 Marketplace
+- Plugin lifecycle: install → configure → activate → execute → deactivate → uninstall
+- Marketplace: browse, search, filter, install, review with star ratings
+- Plugin tiers: official, verified, community
+- Marketplace categories: integration, test_runner, notification, analytics, utility
+- 2 dashboard panels: PluginManagementPanel, MarketplacePanel
+- Audit logging on all data-modifying operations
+- Execution history with resource consumption tracking (duration, memory, CPU)
+
+---
+Task ID: 34
+Agent: Main Agent
+Task: M34 — Phase 6 Integration & Polish
+
+Work Log:
+- Created 3 Cross-Feature Integration API Routes:
+  - POST /api/integration/promote-to-checkpoint — Test-to-Monitor Pipeline: Promotes a test case to a synthetic monitoring checkpoint. Auto-generates steps from test case code, creates SyntheticCheckpoint, logs to audit trail.
+  - POST /api/intelligence/auto-heal — Intelligence-to-Action Loop: Finds flaky tests via FlakinessReport, triggers selector repair via self-heal engine, prioritizes by failCluster, creates SelectorRepair records, logs to audit trail.
+  - GET /api/integration/audit-summary — Compliance-to-Audit Trail: Aggregated audit summary across all Phase 6 actions. Supports teamId, dateRange (7d/30d/90d), and category filters. Returns byActionType, bySeverity, topActors, timeline, and Phase 6 category breakdown.
+- Created 4 SDK Resource Classes under /src/lib/sdk/:
+  - intelligence.ts — IntelligenceResource with select(), analyzeFlakiness(), prioritize(), getDependencies()
+  - self-heal.ts — SelfHealResource with autoRepair(), getSelectorRepairs(), scanMaintenance(), getDeprecations()
+  - monitoring.ts — MonitoringResource with listCheckpoints(), createCheckpoint(), runCheckpoint(), getBaselines(), getRegressions()
+  - plugins.ts — PluginsResource with list(), install(), configure(), activate(), deactivate()
+  - index.ts — ProbatoSDK class that composes all 4 resources with config (baseUrl, apiKey). Re-exports all resource classes, error classes, and types.
+- Updated API Documentation (OpenAPI spec in /src/lib/api/openapi.ts):
+  - Added 6 new Phase 6 tag groups: Intelligence, Self-Healing, Monitoring, SSO & Audit, Plugins, Integration
+  - Added 30+ new endpoint definitions covering all Phase 6 API routes
+  - Each endpoint includes summary, description, parameters, request bodies, and response codes
+- Created Performance Optimization Utility (/src/lib/performance.ts):
+  - getFlakinessScoreCache() — Optimized aggregation of flakiness scores with single query
+  - getPerformanceBaselineCache() — Computes p50/p75/p95 from rolling window of checkpoint results
+  - getAuditLogAggregates() — Pre-computed audit log aggregates for dashboard (action counts, severity, timeline, top actors)
+  - getConnectionPoolStats() — Connection pool utilization metrics
+  - QueryTimer class — Simple performance tracker with slow query warning (>500ms)
+- Created Integration Dashboard Panel (/src/components/integration-panel.tsx):
+  - 4-tab layout: Intelligence→Action, Test→Monitor, Compliance, Phase 6 Health
+  - Intelligence-to-Action: Lists flaky tests with one-click Auto-Heal button, shows repair results
+  - Test-to-Monitor: Lists test cases with Promote to Checkpoint button, shows promotion results
+  - Compliance Overview: Audit summary with total actions, severity breakdown, category breakdown, activity timeline chart
+  - Phase 6 Health: Health indicators for each subsystem (Intelligence, Self-Heal, Monitoring, SSO, Plugins) with integration health progress bar
+- Integrated into Dashboard (/src/app/dashboard/page.tsx):
+  - Added GitMerge icon button in toolbar (M34)
+  - Added showIntegrationPanel state
+  - Added IntegrationPanel rendering with onClose callback
+  - Added GitMerge to lucide-react imports
+- Prisma client regenerated successfully
+- No new lint errors in M34 files (pre-existing errors unchanged)
+- TypeScript compilation passes for all M34 files
+
+Stage Summary:
+- ✅ M34 (Phase 6 Integration & Polish) COMPLETE
+- 3 new API routes bridging Phase 6 features together
+- 5 new SDK files (4 resource classes + index) with full TypeScript types
+- OpenAPI spec updated with 30+ Phase 6 endpoints across 6 tag groups
+- Performance optimization utility for database query caching
+- Integration Dashboard Panel with 4 tabs for cross-feature workflows
+- Dashboard toolbar integration with GitMerge button

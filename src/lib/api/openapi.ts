@@ -656,6 +656,382 @@ export function generateOpenAPISpec(baseUrl: string = "https://probato.ai"): Ope
           responses: { "200": { description: "Usage statistics" } },
         },
       },
+
+      // ═══════════════════════════════════════════
+      // Phase 6: AI Intelligence & Self-Healing
+      // ═══════════════════════════════════════════
+
+      "/intelligence/impact": {
+        post: {
+          tags: ["Phase 6: Intelligence"],
+          summary: "Impact analysis",
+          description: "Analyze the impact of changed files on existing tests. Identifies affected test cases and computes priority scores.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["projectId"], properties: { projectId: { type: "string" }, changedFiles: { type: "array", items: { type: "string" } } } } } },
+          },
+          responses: { "200": { description: "Impact analysis results" }, "404": { description: "Project not found" } },
+        },
+      },
+      "/intelligence/select": {
+        post: {
+          tags: ["Phase 6: Intelligence"],
+          summary: "Smart test selection",
+          description: "AI-powered test selection based on changed files and impact analysis. Selects only the tests that matter.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["projectId"], properties: { projectId: { type: "string" }, changedFiles: { type: "array", items: { type: "string" } }, impactThreshold: { type: "number" } } } } },
+          },
+          responses: { "200": { description: "Selected tests with rationale" }, "404": { description: "Project not found" } },
+        },
+      },
+      "/intelligence/prioritize": {
+        post: {
+          tags: ["Phase 6: Intelligence"],
+          summary: "Priority ordering",
+          description: "Order tests by execution priority based on risk scores, flakiness, and dependency analysis.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["projectId"], properties: { projectId: { type: "string" } } } } },
+          },
+          responses: { "200": { description: "Priority-ordered test list" } },
+        },
+      },
+      "/intelligence/dependencies": {
+        get: {
+          tags: ["Phase 6: Intelligence"],
+          summary: "Dependency graph",
+          description: "Get the test dependency graph for a project, showing relationships between tests and code.",
+          parameters: [{ name: "projectId", in: "query", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Dependency graph with nodes and edges" } },
+        },
+      },
+      "/intelligence/flakiness": {
+        post: {
+          tags: ["Phase 6: Intelligence"],
+          summary: "Flakiness analysis",
+          description: "Analyze test flakiness across a project. Identifies flaky, failing, and stable tests with root cause indicators.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["projectId"], properties: { projectId: { type: "string" } } } } },
+          },
+          responses: { "200": { description: "Flakiness analysis results" } },
+        },
+      },
+
+      // ═══════════════════════════════════════════
+      // Phase 6: Self-Healing v2
+      // ═══════════════════════════════════════════
+
+      "/self-heal/auto-repair": {
+        post: {
+          tags: ["Phase 6: Self-Healing"],
+          summary: "Auto-repair selectors",
+          description: "Automatically repair broken selectors in test cases using multiple healing strategies.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", properties: { testRunId: { type: "string" }, projectId: { type: "string" }, maxRepairs: { type: "integer", default: 10 } } } } },
+          },
+          responses: { "200": { description: "Repair results" } },
+        },
+      },
+      "/self-heal/selector-repairs": {
+        get: {
+          tags: ["Phase 6: Self-Healing"],
+          summary: "List selector repairs",
+          description: "List all selector repair records, optionally filtered by project.",
+          parameters: [{ name: "projectId", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Selector repair list" } },
+        },
+      },
+      "/self-heal/maintenance/scan": {
+        post: {
+          tags: ["Phase 6: Self-Healing"],
+          summary: "Maintenance scan",
+          description: "Scan project tests for maintenance issues: deprecations, assertion drift, step staleness, code quality.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["projectId"], properties: { projectId: { type: "string" } } } } },
+          },
+          responses: { "200": { description: "Maintenance scan results" } },
+        },
+      },
+      "/self-heal/deprecations": {
+        get: {
+          tags: ["Phase 6: Self-Healing"],
+          summary: "List deprecations",
+          description: "List test deprecation warnings and maintenance records for a project.",
+          parameters: [{ name: "projectId", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Deprecation list" } },
+        },
+      },
+
+      // ═══════════════════════════════════════════
+      // Phase 6: Synthetic Monitoring
+      // ═══════════════════════════════════════════
+
+      "/monitoring/checkpoints": {
+        get: {
+          tags: ["Phase 6: Monitoring"],
+          summary: "List checkpoints",
+          description: "List synthetic monitoring checkpoints.",
+          parameters: [{ name: "projectId", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Checkpoint list" } },
+        },
+        post: {
+          tags: ["Phase 6: Monitoring"],
+          summary: "Create checkpoint",
+          description: "Create a new synthetic monitoring checkpoint.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["name", "url", "steps"], properties: { name: { type: "string" }, url: { type: "string" }, steps: { type: "array", items: { type: "object" } }, intervalMinutes: { type: "integer", default: 5 }, severity: { type: "string" }, projectId: { type: "string" } } } } },
+          },
+          responses: { "201": { description: "Checkpoint created" } },
+        },
+      },
+      "/monitoring/checkpoints/{id}": {
+        get: {
+          tags: ["Phase 6: Monitoring"],
+          summary: "Get checkpoint",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Checkpoint details" }, "404": { description: "Not found" } },
+        },
+        patch: {
+          tags: ["Phase 6: Monitoring"],
+          summary: "Update checkpoint",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Updated" } },
+        },
+        delete: {
+          tags: ["Phase 6: Monitoring"],
+          summary: "Delete checkpoint",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Deleted" } },
+        },
+      },
+      "/monitoring/checkpoints/{id}/run": {
+        post: {
+          tags: ["Phase 6: Monitoring"],
+          summary: "Run checkpoint",
+          description: "Manually run a synthetic monitoring checkpoint and capture performance metrics.",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Checkpoint run results with performance data" } },
+        },
+      },
+      "/monitoring/baselines": {
+        get: {
+          tags: ["Phase 6: Monitoring"],
+          summary: "Performance baselines",
+          description: "Get computed performance baselines (p50/p75/p95) for monitored URLs.",
+          parameters: [{ name: "url", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Baseline list" } },
+        },
+      },
+      "/monitoring/regressions": {
+        get: {
+          tags: ["Phase 6: Monitoring"],
+          summary: "Performance regressions",
+          description: "List detected performance regressions across monitored checkpoints.",
+          parameters: [{ name: "status", in: "query", schema: { type: "string", enum: ["open", "acknowledged", "resolved", "dismissed"] } }],
+          responses: { "200": { description: "Regression list" } },
+        },
+      },
+
+      // ═══════════════════════════════════════════
+      // Phase 6: Enterprise SSO & Audit
+      // ═══════════════════════════════════════════
+
+      "/sso/config": {
+        get: {
+          tags: ["Phase 6: SSO & Audit"],
+          summary: "SSO configuration",
+          description: "List SSO configurations for the team.",
+          parameters: [{ name: "teamId", in: "query", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "SSO configuration list" } },
+        },
+        post: {
+          tags: ["Phase 6: SSO & Audit"],
+          summary: "Create SSO configuration",
+          description: "Create a new SSO configuration (SAML or OIDC) for the team.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["teamId", "protocol", "label"], properties: { teamId: { type: "string" }, protocol: { type: "string", enum: ["saml", "oidc"] }, label: { type: "string" } } } } },
+          },
+          responses: { "201": { description: "SSO configuration created" } },
+        },
+      },
+      "/sso/metadata": {
+        get: {
+          tags: ["Phase 6: SSO & Audit"],
+          summary: "SP metadata",
+          description: "Get Service Provider metadata for SAML SSO configuration.",
+          parameters: [{ name: "teamId", in: "query", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "SP metadata XML" } },
+        },
+      },
+      "/audit/logs": {
+        get: {
+          tags: ["Phase 6: SSO & Audit"],
+          summary: "Audit logs",
+          description: "Query tamper-evident audit logs with filtering.",
+          parameters: [
+            { name: "teamId", in: "query", schema: { type: "string" } },
+            { name: "action", in: "query", schema: { type: "string" } },
+            { name: "severity", in: "query", schema: { type: "string", enum: ["info", "warning", "critical"] } },
+            { name: "limit", in: "query", schema: { type: "integer", default: 50 } },
+          ],
+          responses: { "200": { description: "Audit log entries" } },
+        },
+        post: {
+          tags: ["Phase 6: SSO & Audit"],
+          summary: "Create audit log",
+          description: "Manually create an audit log entry (system use).",
+          responses: { "201": { description: "Audit log created" } },
+        },
+      },
+      "/audit/verify": {
+        post: {
+          tags: ["Phase 6: SSO & Audit"],
+          summary: "Verify hash chain",
+          description: "Verify the integrity of the audit log hash chain.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", properties: { teamId: { type: "string" }, fromEntryId: { type: "string" }, toEntryId: { type: "string" } } } } },
+          },
+          responses: { "200": { description: "Verification result" } },
+        },
+      },
+      "/permissions/policies": {
+        get: {
+          tags: ["Phase 6: SSO & Audit"],
+          summary: "Permission policies",
+          description: "List permission policies for the team.",
+          parameters: [{ name: "teamId", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Policy list" } },
+        },
+        post: {
+          tags: ["Phase 6: SSO & Audit"],
+          summary: "Create permission policy",
+          description: "Create a custom permission policy.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["name", "permissions"], properties: { name: { type: "string" }, description: { type: "string" }, permissions: { type: "array", items: { type: "object" } }, scope: { type: "string" }, teamId: { type: "string" } } } } },
+          },
+          responses: { "201": { description: "Policy created" } },
+        },
+      },
+      "/permissions/check": {
+        post: {
+          tags: ["Phase 6: SSO & Audit"],
+          summary: "Check permission",
+          description: "Check if a user has a specific permission.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["userId", "resource", "action"], properties: { userId: { type: "string" }, resource: { type: "string" }, action: { type: "string" }, projectId: { type: "string" }, teamId: { type: "string" } } } } },
+          },
+          responses: { "200": { description: "Permission check result" } },
+        },
+      },
+
+      // ═══════════════════════════════════════════
+      // Phase 6: Plugin Architecture
+      // ═══════════════════════════════════════════
+
+      "/plugins": {
+        get: {
+          tags: ["Phase 6: Plugins"],
+          summary: "List installed plugins",
+          description: "List all plugins installed for a team.",
+          parameters: [{ name: "teamId", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Plugin list" } },
+        },
+        post: {
+          tags: ["Phase 6: Plugins"],
+          summary: "Install plugin",
+          description: "Install a new plugin from a manifest.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["teamId", "name", "version", "manifest"], properties: { teamId: { type: "string" }, name: { type: "string" }, version: { type: "string" }, manifest: { type: "object" } } } } },
+          },
+          responses: { "201": { description: "Plugin installed" } },
+        },
+      },
+      "/plugins/{id}/activate": {
+        post: {
+          tags: ["Phase 6: Plugins"],
+          summary: "Activate plugin",
+          description: "Activate an installed plugin.",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Plugin activated" } },
+        },
+      },
+      "/marketplace": {
+        get: {
+          tags: ["Phase 6: Plugins"],
+          summary: "Browse marketplace",
+          description: "Browse the plugin marketplace for available plugins.",
+          parameters: [
+            { name: "category", in: "query", schema: { type: "string" } },
+            { name: "search", in: "query", schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Marketplace listings" } },
+        },
+      },
+      "/marketplace/{id}/install": {
+        post: {
+          tags: ["Phase 6: Plugins"],
+          summary: "Install from marketplace",
+          description: "Install a plugin from the marketplace.",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["teamId"], properties: { teamId: { type: "string" } } } } },
+          },
+          responses: { "201": { description: "Plugin installed from marketplace" } },
+        },
+      },
+
+      // ═══════════════════════════════════════════
+      // Phase 6: Integration
+      // ═══════════════════════════════════════════
+
+      "/integration/promote-to-checkpoint": {
+        post: {
+          tags: ["Phase 6: Integration"],
+          summary: "Promote test to monitor",
+          description: "Promote a test case to a synthetic monitoring checkpoint. Bridges test definition with production monitoring.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["testCaseId"], properties: { testCaseId: { type: "string" }, intervalMinutes: { type: "integer", default: 5 }, severity: { type: "string" } } } } },
+          },
+          responses: { "200": { description: "Checkpoint created from test case" }, "404": { description: "Test case not found" } },
+        },
+      },
+      "/intelligence/auto-heal": {
+        post: {
+          tags: ["Phase 6: Integration"],
+          summary: "Auto-heal from flakiness",
+          description: "Trigger self-healing based on flakiness predictions. Bridges intelligence with self-healing engine.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["projectId"], properties: { projectId: { type: "string" }, maxRepairs: { type: "integer", default: 10 } } } } },
+          },
+          responses: { "200": { description: "Auto-heal summary with repairs attempted" } },
+        },
+      },
+      "/integration/audit-summary": {
+        get: {
+          tags: ["Phase 6: Integration"],
+          summary: "Cross-feature audit summary",
+          description: "Aggregated audit summary across all Phase 6 actions. Returns action counts, severity breakdown, top actors, and timeline.",
+          parameters: [
+            { name: "teamId", in: "query", schema: { type: "string" } },
+            { name: "dateRange", in: "query", schema: { type: "string", enum: ["7d", "30d", "90d"], default: "30d" } },
+            { name: "category", in: "query", schema: { type: "string", enum: ["intelligence", "self_heal", "monitoring", "sso", "plugins", "general"] } },
+          ],
+          responses: { "200": { description: "Aggregated audit summary" } },
+        },
+      },
     },
     tags: [
       { name: "Projects", description: "Manage testing projects" },
@@ -668,6 +1044,12 @@ export function generateOpenAPISpec(baseUrl: string = "https://probato.ai"): Ope
       { name: "Fix Suggestions", description: "AI-powered fix suggestions and approval workflow" },
       { name: "Billing", description: "Subscription and credit management" },
       { name: "Usage", description: "API usage analytics" },
+      { name: "Phase 6: Intelligence", description: "AI test intelligence — smart selection, flakiness analysis, impact prioritization, dependency graphs" },
+      { name: "Phase 6: Self-Healing", description: "Self-healing selectors, maintenance scans, deprecation tracking" },
+      { name: "Phase 6: Monitoring", description: "Synthetic monitoring checkpoints, performance baselines, regressions" },
+      { name: "Phase 6: SSO & Audit", description: "Enterprise SSO, tamper-evident audit logs, RBAC permission policies" },
+      { name: "Phase 6: Plugins", description: "Plugin architecture, marketplace, plugin lifecycle management" },
+      { name: "Phase 6: Integration", description: "Cross-feature integration — test-to-monitor, intelligence-to-action, compliance-to-audit" },
     ],
   };
 }

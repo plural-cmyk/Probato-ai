@@ -63,6 +63,9 @@ import {
   Share2,
   BarChart3,
   Wrench,
+  Box,
+  Store,
+  GitMerge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -113,6 +116,9 @@ import SSOConfigPanel from "@/components/sso-config-panel";
 import AuditLogPanel from "@/components/audit-log-panel";
 import RBACPanel from "@/components/rbac-panel";
 import SyntheticMonitoringPanel from "@/components/synthetic-monitoring-panel";
+import IntegrationPanel from "@/components/integration-panel";
+import PluginManagementPanel from "@/components/plugin-management-panel";
+import MarketplacePanel from "@/components/marketplace-panel";
 
 interface Project {
   id: string;
@@ -505,6 +511,9 @@ export default function DashboardPage() {
   const [showAuditLogPanel, setShowAuditLogPanel] = useState(false);
   const [showRBACPanel, setShowRBACPanel] = useState(false);
   const [showMonitoringPanel, setShowMonitoringPanel] = useState(false);
+  const [showIntegrationPanel, setShowIntegrationPanel] = useState(false);
+  const [showPluginPanel, setShowPluginPanel] = useState(false);
+  const [showMarketplacePanel, setShowMarketplacePanel] = useState(false);
   const [shareDialogProject, setShareDialogProject] = useState<{ id: string; name: string } | null>(null);
 
   // Live Test View state
@@ -1612,6 +1621,39 @@ export default function DashboardPage() {
               <Activity className="h-5 w-5 text-deep-indigo" />
             </Button>
 
+            {/* Integration Panel Button (M34) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowIntegrationPanel(!showIntegrationPanel)}
+              title="Phase 6 Integration (M34)"
+              className={showIntegrationPanel ? "bg-teal-500/10" : ""}
+            >
+              <GitMerge className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
+            {/* Plugin Management Button (M33) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowPluginPanel(!showPluginPanel)}
+              title="Plugin Management (M33)"
+              className={showPluginPanel ? "bg-indigo-500/10" : ""}
+            >
+              <Box className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
+            {/* Marketplace Button (M33) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowMarketplacePanel(!showMarketplacePanel)}
+              title="Marketplace (M33)"
+              className={showMarketplacePanel ? "bg-orange-500/10" : ""}
+            >
+              <Store className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
             {/* Team Collaboration Button */}
             <Button
               variant="ghost"
@@ -2116,6 +2158,33 @@ export default function DashboardPage() {
           <Card className="mb-8 border-border/50">
             <CardContent className="p-6">
               <RBACPanel onClose={() => setShowRBACPanel(false)} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Integration Panel (M34) */}
+        {showIntegrationPanel && (
+          <Card className="mb-8 border-border/50">
+            <CardContent className="p-6">
+              <IntegrationPanel onClose={() => setShowIntegrationPanel(false)} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Plugin Management Panel (M33) */}
+        {showPluginPanel && (
+          <Card className="mb-8 border-border/50">
+            <CardContent className="p-6">
+              <PluginManagementPanel onClose={() => setShowPluginPanel(false)} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Marketplace Panel (M33) */}
+        {showMarketplacePanel && (
+          <Card className="mb-8 border-border/50">
+            <CardContent className="p-6">
+              <MarketplacePanel onClose={() => setShowMarketplacePanel(false)} />
             </CardContent>
           </Card>
         )}

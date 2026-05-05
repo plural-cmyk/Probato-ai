@@ -97,6 +97,7 @@ model User {
   sharedProjects         SharedProject[]   @relation("SharedProjects")
   resourcePermissions    ResourcePermission[]
   syntheticCheckpoints   SyntheticCheckpoint[]
+  marketplaceReviews     MarketplaceReview[]
 }
 
 model Project {
@@ -883,6 +884,7 @@ model Team {
   auditLogs          AuditLog[]
   auditLogExports    AuditLogExport[]
   permissionPolicies PermissionPolicy[]
+  plugins            Plugin[]
 
   @@index([ownerUserId])
   @@index([slug])
@@ -1672,4 +1674,168 @@ model ResourcePermission {
   @@index([userId])
   @@index([policyId])
   @@index([expiresAt])
+}
+
+// ============================================
+// M33: Plugin Architecture & Integrations Marketplace
+// ============================================
+
+model Plugin {
+  id              String   @id @default(cuid())
+  name            String   // Plugin name (npm package style, e.g. "@probato/jira-integration")
+  version         String   // Semver version
+  description     String?
+  author          String?
+  homepage        String?  // URL to plugin docs/source
+  
+  // Manifest
+  manifest        Json     @default("{}") // Full probato-plugin.json manifest: extensionPoints, permissions, config schema
+  
+  // Extension points
+  extensionPoints Json     @default("[]") // [{type:"test_executor",id:"jira-test-runner"},{type:"notification_channel",id:"jira-notification"}]
+  permissions     Json     @default("[]") // ["read:projects","write:test_runs","read:features"]
+  
+  // State
+  tier            String   @default("community") // official, verified, community
+  status          String   @default("installed") // installed, active, deactivated, error
+  enabled         Boolean  @default(false)
+  
+  // Configuration
+  config          Json     @default("{}") // Plugin-specific configuration values
+  
+  // Integrity
+  checksum        String?  // SHA-256 of the plugin package
+  signature       String?  // Digital signature for verified/official plugins
+  
+  // Runtime stats
+  executionCount  Int      @default(0)
+  lastExecutedAt  DateTime?
+  lastError       String?
+  
+  // Private plugin flag
+  isPrivate       Boolean  @default(false) // Team-only, not visible on marketplace
+  
+  installedAt     DateTime @default(now())
+  activatedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  teamId          String   // Plugins are installed at team level
+  team            Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  installedBy     String?  // User ID who installed
+  executions      PluginExecution[]
+
+  @@unique([teamId, name])
+  @@index([teamId])
+  @@index([status])
+  @@index([tier])
+  @@index([enabled])
+  @@index([createdAt])
+}
+
+model PluginExecution {
+  id              String   @id @default(cuid())
+  extensionPoint  String   // Which extension point was invoked
+  input           Json     @default("{}") // Input parameters
+  output          Json     @default("{}") // Output results
+  
+  // Resource consumption
+  durationMs      Int      @default(0) // Execution time in ms
+  memoryUsedKb    Int      @default(0) // Peak memory usage
+  cpuTimeMs       Int      @default(0) // CPU time consumed
+  
+  // Result
+  status          String   @default("completed") // completed, error, timeout, killed
+  error           String?  // Error message if failed
+  
+  createdAt       DateTime @default(now())
+
+  pluginId        String
+  plugin          Plugin   @relation(fields: [pluginId], references: [id], onDelete: Cascade)
+
+  triggeredBy     String?  // User ID or "system" if automated
+
+  @@index([pluginId])
+  @@index([status])
+  @@index([extensionPoint])
+  @@index([createdAt])
+}
+
+model MarketplaceListing {
+  id              String   @id @default(cuid())
+  name            String   // Plugin name
+  version         String   // Latest version
+  description     String
+  longDescription String?  // Markdown long description
+  author          String
+  homepage        String?
+  repository      String?  // Source code URL
+  
+  // Classification
+  category        String   @default("integration") // integration, test_runner, notification, analytics, utility
+  tier            String   @default("community") // official, verified, community
+  tags            String[] @default([])
+  
+  // Marketplace metadata
+  iconUrl         String?  // Plugin icon/logo
+  screenshots     Json     @default("[]") // Array of screenshot URLs
+  
+  // Stats
+  installCount    Int      @default(0)
+  avgRating       Float    @default(0)
+  reviewCount     Int      @default(0)
+  
+  // Requirements
+  requiredPermissions Json  @default("[]") // Permissions this plugin requires
+  minProbatoVersion String? // Minimum Probato version required
+  extensionPoints Json     @default("[]") // Extension points provided
+  configSchema   Json     @default("{}") // JSON Schema for plugin configuration
+  
+  // Package
+  packageUrl      String?  // URL to download the plugin package
+  checksum        String?  // SHA-256 of the latest package
+  signature       String?  // Digital signature
+  
+  // Status
+  status          String   @default("published") // draft, published, deprecated, removed
+  featured        Boolean  @default(false) // Featured on marketplace homepage
+  
+  publishedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  reviews         MarketplaceReview[]
+
+  @@unique([name])
+  @@index([category])
+  @@index([tier])
+  @@index([status])
+  @@index([featured])
+  @@index([installCount])
+  @@index([createdAt])
+}
+
+model MarketplaceReview {
+  id              String   @id @default(cuid())
+  rating          Int      // 1-5 stars
+  title           String?
+  content         String?  // Review text
+  version         String?  // Version of plugin at time of review
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  listingId       String
+  listing         MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  userId          String
+  userName        String?
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, userId]) // One review per user per listing
+  @@index([listingId])
+  @@index([userId])
+  @@index([rating])
+  @@index([createdAt])
 }
