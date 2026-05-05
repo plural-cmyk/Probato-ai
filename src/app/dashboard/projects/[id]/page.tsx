@@ -31,6 +31,7 @@ import SecurityScanPanel from "@/components/security-scan-panel";
 import SecurityProbePanel from "@/components/security-probe-panel";
 import APIProbePanel from "@/components/api-probe-panel";
 import A11yAuditPanel from "@/components/a11y-audit-panel";
+import OrchestratorPanel from "@/components/orchestrator-panel";
 
 interface Feature {
   id: string;
@@ -552,6 +553,14 @@ export default function ProjectDetailPage() {
           />
           <A11yAuditPanel
             key={`a11y-${scanPanelKey}`}
+            projectId={projectId}
+            url={project.sandboxUrl || project.repoUrl}
+          />
+        </div>
+
+        {/* Multi-Device Orchestrator */}
+        <div className="mt-8">
+          <OrchestratorPanel
             projectId={projectId}
             url={project.sandboxUrl || project.repoUrl}
           />

@@ -83,6 +83,7 @@ model User {
   apiProbes              APIProbe[]
   a11yAudits             A11yAudit[]
   mediaVerifications     MediaVerification[]
+  orchestratedSessions   OrchestratedSession[]
   onboardingState        OnboardingState?
   teamMemberships        TeamMember[]
   sentInvitations        TeamInvitation[]  @relation("SentInvitations")
@@ -124,6 +125,7 @@ model Project {
   apiProbes       APIProbe[]
   a11yAudits      A11yAudit[]
   mediaVerifications MediaVerification[]
+  orchestratedSessions OrchestratedSession[]
   comments        Comment[]
   sharedWith      SharedProject[]
 
@@ -178,6 +180,7 @@ model TestRun {
   apiProbes       APIProbe[]
   a11yAudits      A11yAudit[]
   mediaVerifications MediaVerification[]
+  orchestratedSessions OrchestratedSession[]
   comments        Comment[]
 
   @@index([projectId])
@@ -982,4 +985,87 @@ model FeatureRiskScore {
   @@index([riskScore])
   @@index([flakeRate])
   @@index([failRate])
+}
+
+// ============================================
+// Phase 5: Multi-Device Orchestration (M25)
+// ============================================
+
+model OrchestratedSession {
+  id              String    @id @default(cuid())
+  scenarioType    String    @default("custom")  // messaging, call, payment, custom
+  status          String    @default("pending")  // pending, running, completed, failed, aborted
+  url             String    // Target URL for the orchestrated test
+  config          Json      @default("{}")       // Scenario config (agents, sync points, options)
+  overallScore    Int       @default(0)           // 0-100 aggregated score
+  agentResults    Json      @default("{}")        // Per-agent results
+  summary         String?                         // AI-generated summary
+  findings        Json      @default("[]")        // Aggregated findings across agents
+  recommendations Json      @default("[]")        // Array of recommendation strings
+  llmUsed         Boolean   @default(false)
+  duration        Int       @default(0)           // Total session duration in ms
+  error           String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  projectId       String?
+  project         Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testRunId       String?
+  testRun         TestRun?  @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  sandboxes       SandboxInstance[]
+  syncEvents      SyncEvent[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@index([scenarioType])
+  @@index([createdAt])
+}
+
+model SandboxInstance {
+  id              String              @id @default(cuid())
+  agentRole       String              // sender, receiver, caller, callee, payer, merchant, observer
+  browserId       String?             // Browser instance identifier
+  status          String              @default("provisioning")  // provisioning, ready, running, done, error
+  actions         Json                @default("[]")  // Assigned action sequence
+  results         Json                @default("[]")  // Step-by-step results
+  score           Int                 @default(0)     // 0-100 per-agent score
+  errorLog        String?             // Error details if failed
+  screenshotUrl   String?             // Screenshot of final state
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  sessionId       String
+  session         OrchestratedSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([status])
+  @@index([agentRole])
+}
+
+model SyncEvent {
+  id              String              @id @default(cuid())
+  eventType       String              // barrier, signal, state_update, error, release
+  sourceAgent     String              // Agent role that produced the event
+  targetAgent     String?             // Target agent role (null = broadcast)
+  payload         Json                @default("{}")  // Event data
+  consumed        Boolean             @default(false)
+  consumedAt      DateTime?
+  createdAt       DateTime            @default(now())
+
+  sessionId       String
+  session         OrchestratedSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, eventType])
+  @@index([sessionId, targetAgent, consumed])
+  @@index([consumed])
 }

@@ -163,7 +163,8 @@ export type CreditAction =
   | "security_probe"
   | "api_probe"
   | "a11y_audit"
-  | "media_verification";
+  | "media_verification"
+  | "orchestrated_test";
 
 export interface CreditCostDefinition {
   action: CreditAction;
@@ -257,6 +258,13 @@ export const CREDIT_COSTS: Record<CreditAction, CreditCostDefinition> = {
     unit: "per use",
     description: "API security probing (endpoint discovery, CSRF, rate limiting, IDOR testing)",
     estimatedCostUsd: 0.25,
+  },
+  orchestrated_test: {
+    action: "orchestrated_test",
+    credits: 12,
+    unit: "per session",
+    description: "Multi-device orchestrated test (2+ browser agents with sync coordination)",
+    estimatedCostUsd: 0.40,
   },
 };
 
