@@ -134,6 +134,10 @@ model Project {
   paymentFlowTestSessions PaymentFlowTestSession[]
   comments        Comment[]
   sharedWith      SharedProject[]
+  dependencyEdges    TestDependencyGraph[]
+  smartSelections    SmartSelectionResult[]
+  impactAnalyses     ImpactAnalysisResult[]
+  maintenanceRecords TestMaintenanceRecord[]
 
   @@index([userId])
   @@index([teamId])
@@ -230,6 +234,9 @@ model TestCase {
   feature   Feature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
 
   fixSuggestions FixSuggestion[]
+  dependencies  TestDependencyGraph[]
+  flakinessReport FlakinessReport?
+  selectorRepairs SelectorRepair[]
 
   @@index([featureId])
 }
@@ -1220,6 +1227,160 @@ model PaymentFlowTestSession {
 
   @@index([userId])
   @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================
+// Phase 6: AI Test Intelligence (M29)
+// ============================================
+
+model TestDependencyGraph {
+  id              String   @id @default(cuid())
+  testCaseId      String
+  projectId       String
+  sourcePath      String   // File path in repo
+  functionName    String?  // Function or component name
+  dependencyType  String   // import, call, render, navigate, api_call
+  confidence      Float    @default(0) // 0-1 confidence score
+  lastVerifiedAt  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  testCase        TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([testCaseId])
+  @@index([projectId])
+  @@index([sourcePath])
+  @@index([dependencyType])
+  @@unique([testCaseId, sourcePath, functionName, dependencyType])
+}
+
+model SmartSelectionResult {
+  id              String   @id @default(cuid())
+  projectId       String
+  triggeringFiles Json     @default("[]") // Array of changed file paths
+  selectedTests   Json     @default("[]") // Array of selected testCase IDs
+  skippedTests    Json     @default("[]") // Array of skipped testCase IDs
+  rationale       String?  // AI-generated explanation
+  coveragePercent Float    @default(0) // Estimated coverage of changes
+  actualOutcomes  Json?    // Filled after test run: pass/fail/skip per test
+  createdAt       DateTime @default(now())
+
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+model FlakinessReport {
+  id                String   @id @default(cuid())
+  testCaseId        String
+  flakinessScore    Int      @default(0)   // 0-100
+  classification    String   @default("unknown") // stable, flaky, failing, unknown
+  primaryIndicator  String?  // timing, order_dependency, resource_contention, external_dependency
+  confidence        Float    @default(0)   // 0-1
+  recentOutcomes    Json     @default("[]") // Last 10 run outcomes as JSON array
+  lastAnalyzedAt    DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  testCase          TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  alerts            FlakinessAlert[]
+
+  @@unique([testCaseId])
+  @@index([classification])
+  @@index([flakinessScore])
+}
+
+model FlakinessAlert {
+  id              String   @id @default(cuid())
+  testCaseId      String
+  testRunId       String?  // The run that triggered this alert
+  alertType       String   // new_flaky, score_increase, pattern_detected
+  message         String
+  previousScore   Int?
+  currentScore    Int?
+  dismissed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  flakinessReport FlakinessReport @relation(fields: [flakinessReportId], references: [id], onDelete: Cascade)
+  flakinessReportId String
+
+  @@index([testCaseId])
+  @@index([alertType])
+  @@index([dismissed])
+  @@index([createdAt])
+}
+
+model ImpactAnalysisResult {
+  id              String   @id @default(cuid())
+  projectId       String
+  triggeringFiles Json     @default("[]") // Changed files
+  priorityOrder   Json     @default("[]") // Ordered array of { testCaseId, priorityScore, reason }
+  totalAffected   Int      @default(0)
+  criticalCount   Int      @default(0)
+  highCount       Int      @default(0)
+  mediumCount     Int      @default(0)
+  lowCount        Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+// ============================================
+// Phase 6: Self-Healing Tests v2 & Auto-Maintenance (M30)
+// ============================================
+
+model SelectorRepair {
+  id              String   @id @default(cuid())
+  testCaseId      String
+  oldSelector     String   // The selector that broke
+  newSelector     String   // The healed replacement selector
+  confidence      Float    @default(0) // 0-1 confidence score
+  status          String   @default("pending") // pending, approved, rejected, applied, reverted
+  domSnapshot     Json?    // DOM snapshot before and after repair
+  verifiedAt      DateTime? // When the repair was verified by re-running
+  appliedAt       DateTime?
+  appliedBy       String?  // User ID who approved
+  reviewNote      String?
+  testRunId       String?  // Test run that verified the repair
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  testCase        TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+
+  @@index([testCaseId])
+  @@index([status])
+  @@index([confidence])
+  @@index([createdAt])
+}
+
+model TestMaintenanceRecord {
+  id              String   @id @default(cuid())
+  projectId       String
+  testCaseId      String?
+  category        String   // deprecation, assertion_drift, step_staleness, code_quality
+  severity        String   // critical, warning, info
+  title           String
+  description     String
+  suggestedDiff   String?  // Unified diff of suggested code change
+  effort          Int      @default(0) // 1-5 effort score
+  status          String   @default("open") // open, in_progress, resolved, dismissed
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([testCaseId])
+  @@index([category])
+  @@index([severity])
   @@index([status])
   @@index([createdAt])
 }

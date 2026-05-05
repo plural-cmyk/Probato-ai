@@ -105,6 +105,8 @@ import TeamCollaborationPanel from "@/components/team-collaboration-panel";
 import ShareProjectDialog from "@/components/share-project-dialog";
 import TestIntelligencePanel from "@/components/test-intelligence-panel";
 import MediaVerificationPanel from "@/components/media-verification-panel";
+import AIIntelligencePanel from "@/components/ai-intelligence-panel";
+import SelfHealV2Panel from "@/components/self-heal-v2-panel";
 
 interface Project {
   id: string;
@@ -491,6 +493,8 @@ export default function DashboardPage() {
   // Team Collaboration state
   const [showTeamPanel, setShowTeamPanel] = useState(false);
   const [showIntelligencePanel, setShowIntelligencePanel] = useState(false);
+  const [showAIIntelligencePanel, setShowAIIntelligencePanel] = useState(false);
+  const [showSelfHealV2Panel, setShowSelfHealV2Panel] = useState(false);
   const [shareDialogProject, setShareDialogProject] = useState<{ id: string; name: string } | null>(null);
 
   // Live Test View state
@@ -1532,6 +1536,28 @@ export default function DashboardPage() {
               <BrainCircuit className="h-5 w-5 text-deep-indigo" />
             </Button>
 
+            {/* AI Intelligence Button (M29) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowAIIntelligencePanel(!showAIIntelligencePanel)}
+              title="AI Test Intelligence (M29)"
+              className={showAIIntelligencePanel ? "bg-electric-violet/10" : ""}
+            >
+              <BarChart3 className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
+            {/* Self-Heal v2 Button (M30) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowSelfHealV2Panel(!showSelfHealV2Panel)}
+              title="Self-Healing v2 (M30)"
+              className={showSelfHealV2Panel ? "bg-emerald/10" : ""}
+            >
+              <Wrench className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
             {/* Team Collaboration Button */}
             <Button
               variant="ghost"
@@ -1976,6 +2002,28 @@ export default function DashboardPage() {
           <Card className="mb-8 border-border/50">
             <CardContent className="p-6">
               <TestIntelligencePanel
+                projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* AI Test Intelligence Panel (M29) */}
+        {showAIIntelligencePanel && (
+          <Card className="mb-8 border-border/50">
+            <CardContent className="p-6">
+              <AIIntelligencePanel
+                projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Self-Healing v2 Panel (M30) */}
+        {showSelfHealV2Panel && (
+          <Card className="mb-8 border-border/50">
+            <CardContent className="p-6">
+              <SelfHealV2Panel
                 projects={projects.map((p) => ({ id: p.id, name: p.name }))}
               />
             </CardContent>

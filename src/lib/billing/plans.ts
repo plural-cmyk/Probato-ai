@@ -167,7 +167,13 @@ export type CreditAction =
   | "orchestrated_test"
   | "messaging_test"
   | "call_flow_test"
-  | "payment_flow_test";
+  | "payment_flow_test"
+  | "smart_selection"
+  | "flakiness_analysis"
+  | "impact_analysis"
+  | "dependency_rebuild"
+  | "selector_repair"
+  | "maintenance_scan";
 
 export interface CreditCostDefinition {
   action: CreditAction;
@@ -289,6 +295,48 @@ export const CREDIT_COSTS: Record<CreditAction, CreditCostDefinition> = {
     unit: "per session",
     description: "Payment flow test (Stripe test mode checkout with card scenarios, webhook verification, multi-currency)",
     estimatedCostUsd: 0.50,
+  },
+  smart_selection: {
+    action: "smart_selection",
+    credits: 5,
+    unit: "per use",
+    description: "Smart test selection based on code changes",
+    estimatedCostUsd: 0.15,
+  },
+  flakiness_analysis: {
+    action: "flakiness_analysis",
+    credits: 10,
+    unit: "per use",
+    description: "Batch flakiness analysis on a project",
+    estimatedCostUsd: 0.30,
+  },
+  impact_analysis: {
+    action: "impact_analysis",
+    credits: 20,
+    unit: "per use",
+    description: "Full impact analysis with prioritization",
+    estimatedCostUsd: 0.60,
+  },
+  dependency_rebuild: {
+    action: "dependency_rebuild",
+    credits: 3,
+    unit: "per use",
+    description: "Rebuild dependency graph from execution traces",
+    estimatedCostUsd: 0.08,
+  },
+  selector_repair: {
+    action: "selector_repair",
+    credits: 8,
+    unit: "per repair",
+    description: "AI-powered selector self-healing with visual + semantic matching",
+    estimatedCostUsd: 0.25,
+  },
+  maintenance_scan: {
+    action: "maintenance_scan",
+    credits: 6,
+    unit: "per use",
+    description: "Scan project for deprecations, assertion drift, and code quality issues",
+    estimatedCostUsd: 0.18,
   },
 };
 
