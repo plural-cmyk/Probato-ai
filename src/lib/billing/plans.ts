@@ -165,7 +165,8 @@ export type CreditAction =
   | "a11y_audit"
   | "media_verification"
   | "orchestrated_test"
-  | "messaging_test";
+  | "messaging_test"
+  | "call_flow_test";
 
 export interface CreditCostDefinition {
   action: CreditAction;
@@ -272,6 +273,13 @@ export const CREDIT_COSTS: Record<CreditAction, CreditCostDefinition> = {
     credits: 12,
     unit: "per session",
     description: "Cross-device messaging & notification test (sender/receiver agents with delivery verification)",
+    estimatedCostUsd: 0.40,
+  },
+  call_flow_test: {
+    action: "call_flow_test",
+    credits: 12,
+    unit: "per session",
+    description: "Cross-device call flow test (caller/callee agents with dial-answer-hangup verification)",
     estimatedCostUsd: 0.40,
   },
 };

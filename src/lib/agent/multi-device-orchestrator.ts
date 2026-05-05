@@ -511,7 +511,19 @@ async function executeAction(
           return { evidence: `Messaging action fallback: ${action.value} — ${err instanceof Error ? err.message : String(err)}` };
         }
       }
-      // Generic custom action fallback for M27/M28
+      // Delegate call flow-specific custom actions to M27 handler
+      if (["dial", "answer", "hangup", "verify_ring", "verify_incoming_call",
+           "verify_call_connected", "verify_call_ended", "verify_call_timer",
+           "verify_call_quality", "verify_audio_indicator", "toggle_mute",
+           "toggle_speaker", "toggle_video"].includes(action.value ?? "")) {
+        try {
+          const { handleCallCustomAction } = await import("@/lib/agent/call-flow-tester");
+          return await handleCallCustomAction(page, action, sessionId, agentRole, syncTimeoutMs);
+        } catch (err: unknown) {
+          return { evidence: `Call flow action fallback: ${action.value} — ${err instanceof Error ? err.message : String(err)}` };
+        }
+      }
+      // Generic custom action fallback for M28+
       return { evidence: `Custom action: ${action.description ?? action.value ?? "undefined"}` };
     }
     default: {
