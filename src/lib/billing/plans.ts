@@ -160,7 +160,8 @@ export type CreditAction =
   | "fix_suggestion"
   | "screenshot_storage"
   | "security_scan"
-  | "a11y_audit";
+  | "a11y_audit"
+  | "media_verification";
 
 export interface CreditCostDefinition {
   action: CreditAction;
@@ -233,6 +234,13 @@ export const CREDIT_COSTS: Record<CreditAction, CreditCostDefinition> = {
     unit: "per use",
     description: "WCAG accessibility audit (contrast, ARIA, keyboard, forms)",
     estimatedCostUsd: 0.15,
+  },
+  media_verification: {
+    action: "media_verification",
+    credits: 4,
+    unit: "per use",
+    description: "Media verification (images, video, audio health + Whisper transcription)",
+    estimatedCostUsd: 0.14,
   },
 };
 

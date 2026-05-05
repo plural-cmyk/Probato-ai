@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { url, projectId, checkImages, checkVideos, captureFrames, maxFrames } = body;
+    const { url, projectId, checkImages, checkVideos, checkAudio, captureFrames, maxFrames, transcribeAudio, maxTranscriptions } = body;
 
     if (!url || typeof url !== "string") {
       return NextResponse.json(
@@ -40,8 +40,11 @@ export async function POST(request: NextRequest) {
       projectId: projectId || undefined,
       checkImages: checkImages !== false,
       checkVideos: checkVideos !== false,
+      checkAudio: checkAudio !== false,
       captureFrames: captureFrames === true,
       maxFrames: maxFrames ? Math.min(Number(maxFrames), 10) : 5,
+      transcribeAudio: transcribeAudio === true,
+      maxTranscriptions: maxTranscriptions ? Math.min(Number(maxTranscriptions), 5) : 3,
     });
 
     if (result.error) {
