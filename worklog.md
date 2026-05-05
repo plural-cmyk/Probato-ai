@@ -1309,3 +1309,45 @@ Stage Summary:
 - M24 complete: Active Security Agent v2 with API Security, CSRF, Rate Limiting, IDOR
 - 8 files changed, 1903 insertions
 - Phase 4 COMPLETE: M21✅ M22✅ M23✅ M24✅
+
+---
+Task ID: M25
+Agent: Main Agent
+Task: Implement M25 — Multi-Sandbox Orchestrator (Phase 5 foundation)
+
+Work Log:
+- Read existing agent/API/UI patterns from M23/M24 for consistency
+- Added 3 new Prisma models to schema.prisma: OrchestratedSession, SandboxInstance, SyncEvent
+- Added relation arrays to User, Project, TestRun models
+- Ran prisma generate successfully
+- Added orchestrated_test credit action (12 credits, $0.40) to billing/plans.ts
+- Built src/lib/agent/multi-device-orchestrator.ts (580+ lines) with:
+  - Parallel and batched browser execution (max 2 concurrent, sequential fallback)
+  - Database-backed SyncEvent bus for serverless-safe coordination
+  - Barrier, signal, waitForSignal, state_update sync primitives
+  - 3-tier LLM analysis (z-ai → external API → rule-based fallback)
+  - Default agent configs for messaging, call, payment, custom scenarios
+  - Action executor supporting navigate, click, fill, wait, assert, screenshot, barrier, signal
+  - Credit check → deduct → execute → persist lifecycle
+  - Session abort capability
+- Built 3 API routes:
+  - POST/GET /api/orchestrator/sessions (create + list)
+  - GET /api/orchestrator/sessions/[id] (detail with sandboxes + sync events)
+  - POST /api/orchestrator/sessions/[id]/abort (abort running session)
+- Built src/components/orchestrator-panel.tsx (400+ lines) with:
+  - Score circles, sandbox agent cards, findings with severity badges
+  - Scenario type selector (messaging/call/payment/custom)
+  - Session history with detail expansion
+  - New session form with URL input and scenario selection
+- Integrated OrchestratorPanel into project detail page
+- Build succeeded with zero errors
+- Committed and pushed to main
+
+Stage Summary:
+- M25 is COMPLETE — Multi-Sandbox Orchestrator foundation for Phase 5
+- 8 files changed, 1758 insertions
+- New Prisma models: OrchestratedSession, SandboxInstance, SyncEvent
+- New credit action: orchestrated_test (12 credits)
+- 3 API routes under /api/orchestrator/
+- 1 new UI component: orchestrator-panel.tsx
+- Phase 5 progress: 1/4 milestones (M25 done, M26-M28 remaining)
