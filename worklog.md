@@ -1161,3 +1161,53 @@ Stage Summary:
 - ✅ Fixed onboarding API 500 errors (graceful DB fallbacks)
 - ✅ Removed dead Monitor import from test-intelligence-panel
 - ✅ All changes pushed to trigger Vercel deployment
+
+---
+Task ID: M21
+Agent: Main Agent
+Task: Phase 4 Milestone 21 - Media Verification Agent (Images & Video)
+
+Work Log:
+- Added MediaVerification Prisma model with fields: status, url, overallScore, imageScore, videoScore, audioScore, imageChecks, videoChecks, audioChecks, summary, llmUsed, duration, error
+- Added mediaVerifications relations to User, Project, and TestRun models
+- Generated Prisma client with new model
+- Built Media Verifier Agent (src/lib/agent/media-verifier.ts):
+  - Image verification: checks <img> elements for broken (0×0 natural dimensions), hidden (CSS display:none/visibility:hidden/opacity:0), distorted (aspect ratio mismatch), missing alt text
+  - Also checks <picture> elements and CSS background-image URLs
+  - Video verification: checks <video> elements for readyState, error, duration, source availability, audio/video tracks
+  - Optional frame capture at key timestamps (0%, 25%, 50%, 75%, 100%) with black-frame detection
+  - 3-tier LLM analysis (z-ai-web-dev-sdk → external API → rule-based fallback)
+  - Score calculation: starts at 100, deducts by severity (critical -20, high -10, medium -5, low -2, info -0)
+  - Credit metering using security_scan cost (3 credits), DB persistence, notification dispatch
+  - Lazy-load handling: waits for networkidle2 + 1.5s for dynamic images
+- Created API routes:
+  - POST /api/media/verify — run media verification with URL validation
+  - GET /api/media/verifications — list verifications with pagination and filters
+  - GET /api/media/verifications/[id] — single verification detail with project relation
+- Built Media Verification Panel (src/components/media-verification-panel.tsx):
+  - ScoreCircle SVG indicators for overall/image/video health
+  - Summary grid: total/broken/hidden/distorted images, total/error/no-source videos
+  - Tab filter (All/Images/Videos) for check results
+  - Expandable Image Check Cards with status badges, dimensions, alt text, CSS hidden indicators
+  - Expandable Video Check Cards with status, readyState, duration, track indicators, frame thumbnails
+  - Capture Frames toggle for video frame screenshots
+  - Editable URL input, Run Verify button, Refresh button
+  - Verification history list
+- Integrated Media Verification section into dashboard page (before Test Intelligence section)
+- Build verified — 72 routes (3 new media routes)
+- Pushed to GitHub (commit d56154d)
+
+Stage Summary:
+- ✅ M21 COMPLETE — Media Verification Agent (Images & Video)
+- Phase 4 progress: 1/4 milestones done (M21 ✅, M22 🔲, M23 🔲, M24 🔲)
+- Blueprint QA criteria: ✅ Agent detects 404 image on page, ✅ Agent detects video playback errors
+- Audio verification (M22) will add Whisper integration for speech-to-text
+- Active security probing (M23-M24) will extend the existing passive scanner
+
+═══════════════════════════════════════════════════════
+PHASE 4 PROGRESS
+═══════════════════════════════════════════════════════
+M21: Media Verification (Image + Video)  ✅
+M22: Audio Verification + Whisper        🔲
+M23: Active Security v1 (XSS + Auth)     🔲
+M24: Active Security v2 (API + IDOR)     🔲
