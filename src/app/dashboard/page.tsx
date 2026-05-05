@@ -109,6 +109,10 @@ import TestIntelligencePanel from "@/components/test-intelligence-panel";
 import MediaVerificationPanel from "@/components/media-verification-panel";
 import AIIntelligencePanel from "@/components/ai-intelligence-panel";
 import SelfHealV2Panel from "@/components/self-heal-v2-panel";
+import SSOConfigPanel from "@/components/sso-config-panel";
+import AuditLogPanel from "@/components/audit-log-panel";
+import RBACPanel from "@/components/rbac-panel";
+import SyntheticMonitoringPanel from "@/components/synthetic-monitoring-panel";
 
 interface Project {
   id: string;
@@ -497,6 +501,10 @@ export default function DashboardPage() {
   const [showIntelligencePanel, setShowIntelligencePanel] = useState(false);
   const [showAIIntelligencePanel, setShowAIIntelligencePanel] = useState(false);
   const [showSelfHealV2Panel, setShowSelfHealV2Panel] = useState(false);
+  const [showSSOConfigPanel, setShowSSOConfigPanel] = useState(false);
+  const [showAuditLogPanel, setShowAuditLogPanel] = useState(false);
+  const [showRBACPanel, setShowRBACPanel] = useState(false);
+  const [showMonitoringPanel, setShowMonitoringPanel] = useState(false);
   const [shareDialogProject, setShareDialogProject] = useState<{ id: string; name: string } | null>(null);
 
   // Live Test View state
@@ -1560,6 +1568,50 @@ export default function DashboardPage() {
               <Wrench className="h-5 w-5 text-deep-indigo" />
             </Button>
 
+            {/* SSO Config Button (M32) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowSSOConfigPanel(!showSSOConfigPanel)}
+              title="SSO Configuration (M32)"
+              className={showSSOConfigPanel ? "bg-purple-500/10" : ""}
+            >
+              <Shield className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
+            {/* Audit Log Button (M32) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowAuditLogPanel(!showAuditLogPanel)}
+              title="Audit Log (M32)"
+              className={showAuditLogPanel ? "bg-amber-500/10" : ""}
+            >
+              <FileSearch className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
+            {/* RBAC Button (M32) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowRBACPanel(!showRBACPanel)}
+              title="Permission Policies (M32)"
+              className={showRBACPanel ? "bg-rose-500/10" : ""}
+            >
+              <Users className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
+            {/* Synthetic Monitoring Button (M31) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowMonitoringPanel(!showMonitoringPanel)}
+              title="Synthetic Monitoring (M31)"
+              className={showMonitoringPanel ? "bg-blue-500/10" : ""}
+            >
+              <Activity className="h-5 w-5 text-deep-indigo" />
+            </Button>
+
             {/* Team Collaboration Button */}
             <Button
               variant="ghost"
@@ -2028,6 +2080,42 @@ export default function DashboardPage() {
               <SelfHealV2Panel
                 projects={projects.map((p) => ({ id: p.id, name: p.name }))}
               />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Synthetic Monitoring Panel (M31) */}
+        {showMonitoringPanel && (
+          <Card className="mb-8 border-border/50">
+            <CardContent className="p-6">
+              <SyntheticMonitoringPanel onClose={() => setShowMonitoringPanel(false)} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* SSO Config Panel (M32) */}
+        {showSSOConfigPanel && (
+          <Card className="mb-8 border-border/50">
+            <CardContent className="p-6">
+              <SSOConfigPanel onClose={() => setShowSSOConfigPanel(false)} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Audit Log Panel (M32) */}
+        {showAuditLogPanel && (
+          <Card className="mb-8 border-border/50">
+            <CardContent className="p-6">
+              <AuditLogPanel onClose={() => setShowAuditLogPanel(false)} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* RBAC Panel (M32) */}
+        {showRBACPanel && (
+          <Card className="mb-8 border-border/50">
+            <CardContent className="p-6">
+              <RBACPanel onClose={() => setShowRBACPanel(false)} />
             </CardContent>
           </Card>
         )}

@@ -95,6 +95,8 @@ model User {
   sharedWithMe           SharedProject[]   @relation("SharedWithUser")
   ownedTeams             Team[]            @relation("OwnedTeams")
   sharedProjects         SharedProject[]   @relation("SharedProjects")
+  resourcePermissions    ResourcePermission[]
+  syntheticCheckpoints   SyntheticCheckpoint[]
 }
 
 model Project {
@@ -138,6 +140,9 @@ model Project {
   smartSelections    SmartSelectionResult[]
   impactAnalyses     ImpactAnalysisResult[]
   maintenanceRecords TestMaintenanceRecord[]
+  syntheticCheckpoints  SyntheticCheckpoint[]
+  performanceBaselines  PerformanceBaseline[]
+  performanceRegressions PerformanceRegression[]
 
   @@index([userId])
   @@index([teamId])
@@ -874,6 +879,10 @@ model Team {
   members     TeamMember[]
   invitations TeamInvitation[]
   projects    Project[]
+  ssoConfiguration   SSOConfiguration?
+  auditLogs          AuditLog[]
+  auditLogExports    AuditLogExport[]
+  permissionPolicies PermissionPolicy[]
 
   @@index([ownerUserId])
   @@index([slug])
@@ -1383,4 +1392,284 @@ model TestMaintenanceRecord {
   @@index([severity])
   @@index([status])
   @@index([createdAt])
+}
+
+// ============================================
+// M31: Synthetic Monitoring & Performance Baselines
+// ============================================
+
+model SyntheticCheckpoint {
+  id              String   @id @default(cuid())
+  name            String   // Human-readable name, e.g. "Homepage Load Check"
+  url             String   // Production URL to monitor
+  steps           Json     @default("[]") // Array of interaction steps: [{type:"navigate",value:"/"},{type:"assert",selector:"h1",value:"Welcome"}]
+  expectedOutcome String?  // Description of expected outcome
+  intervalMinutes Int      @default(5) // Min 5 minutes between checks
+  severity        String   @default("informational") // critical, informational
+  enabled         Boolean  @default(true)
+  lastRunAt       DateTime?
+  lastRunStatus   String?  // passed, failed, error
+  runCount        Int      @default(0)
+  failCount       Int      @default(0)
+  avgResponseTime Float    @default(0) // Average response time in ms
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  results         CheckpointResult[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([enabled])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+model CheckpointResult {
+  id              String   @id @default(cuid())
+  status          String   @default("pending") // pending, passed, failed, error
+  responseTime    Int      @default(0) // Total response time in ms
+  screenshot      String?  // Base64 screenshot on failure
+  error           String?  // Error message if failed
+  stepResults     Json     @default("[]") // Per-step results with timing
+  lcp             Float?   // Largest Contentful Paint
+  fid             Float?   // First Input Delay
+  cls             Float?   // Cumulative Layout Shift
+  ttfb            Float?   // Time to First Byte
+  domContentLoaded Float?  // DOM Content Loaded time
+  fullPageLoad    Float?   // Full page load time
+  createdAt       DateTime @default(now())
+
+  checkpointId    String
+  checkpoint      SyntheticCheckpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+
+  @@index([checkpointId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PerformanceBaseline {
+  id              String   @id @default(cuid())
+  url             String   // URL this baseline covers
+  metricName      String   // lcp, fid, cls, ttfb, domContentLoaded, fullPageLoad
+  mean            Float    @default(0)
+  stdDev          Float    @default(0)
+  p50             Float    @default(0)
+  p75             Float    @default(0)
+  p95             Float    @default(0)
+  sampleCount     Int      @default(0) // Rolling window of last 30 successful executions
+  warningThreshold Float   @default(20) // 20% degradation = warning
+  criticalThreshold Float  @default(50) // 50% degradation = critical
+  lastComputedAt  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  regressions     PerformanceRegression[]
+
+  @@unique([url, metricName, projectId])
+  @@index([projectId])
+  @@index([url])
+  @@index([metricName])
+}
+
+model PerformanceRegression {
+  id              String   @id @default(cuid())
+  metricName      String   // lcp, fid, cls, ttfb, domContentLoaded, fullPageLoad
+  currentValue    Float    // Current observed value
+  baselineValue   Float    // Baseline expected value
+  degradationPercent Float  // Percentage of degradation
+  severity        String   @default("warning") // warning, critical
+  status          String   @default("open") // open, acknowledged, resolved, dismissed
+  screenshot      String?  // Screenshot at time of regression
+  deploymentInfo  Json?    // Deployment correlation data
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  baselineId      String
+  baseline        PerformanceBaseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([baselineId])
+  @@index([projectId])
+  @@index([severity])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================
+// M32: Enterprise SSO, Audit & Compliance, RBAC v2
+// ============================================
+
+model SSOConfiguration {
+  id              String   @id @default(cuid())
+  protocol        String   @default("saml") // saml, oidc
+  label           String   // e.g. "Okta SSO", "Azure AD"
+  enabled         Boolean  @default(true)
+  
+  // SAML-specific fields
+  samlEntryUrl    String?  // IdP SSO URL
+  samlLogoutUrl   String?  // IdP SLO URL
+  samlCertificate String?  // IdP X.509 certificate
+  samlIssuer      String?  // IdP Entity ID
+  
+  // OIDC-specific fields
+  oidcClientId     String?
+  oidcClientSecret String?  // Encrypted
+  oidcDiscoveryUrl String?  // .well-known/openid-configuration
+  oidcScopes       String[] @default(["openid", "email", "profile"])
+  
+  // Group-to-role mapping
+  groupRoleMapping Json     @default("{}") // { "engineering": "member", "managers": "admin" }
+  
+  // Domain restrictions
+  allowedDomains   String[] @default([]) // e.g. ["company.com"]
+  
+  // Auto-provisioning
+  autoProvision    Boolean  @default(true) // Auto-create users on first SSO login
+  
+  status          String   @default("active") // active, disabled, testing
+  lastTestedAt    DateTime?
+  lastError       String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  teamId          String   @unique // One SSO config per team
+  team            Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([protocol])
+  @@index([status])
+}
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  action          String   // e.g. "project.create", "test.run", "user.login", "sso.config.update"
+  resource        String   // Resource type: project, test_run, user, team, etc.
+  resourceId      String?  // ID of the affected resource
+  resourceType    String?  // Type of the affected resource
+  
+  // Who performed the action
+  userId          String?
+  userEmail       String?
+  userName        String?
+  
+  // Context
+  ipAddress       String?
+  userAgent       String?
+  
+  // What changed
+  beforeSnapshot  Json?    // State before the change
+  afterSnapshot   Json?    // State after the change
+  metadata        Json?    // Additional context
+  
+  // Tamper-evident hash chain
+  previousHash    String?  // SHA-256 hash of the previous audit log entry
+  entryHash       String   // SHA-256 hash of this entry (computed from all fields + previousHash)
+  chainValid      Boolean  @default(true) // Whether this entry's hash chain is valid
+  
+  // Severity for filtering
+  severity        String   @default("info") // info, warning, critical
+  
+  createdAt       DateTime @default(now())
+
+  teamId          String?  // Team context
+  team            Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([action])
+  @@index([resource])
+  @@index([resourceId])
+  @@index([userId])
+  @@index([teamId])
+  @@index([createdAt])
+  @@index([severity])
+}
+
+model AuditLogExport {
+  id              String   @id @default(cuid())
+  name            String   // e.g. "Weekly SIEM Export"
+  destination     String   // splunk, datadog, aws_cloudtrail, webhook
+  config          Json     @default("{}") // Destination-specific config (URLs, tokens, etc.)
+  retention       String   @default("90d") // 90d, 180d, 1y, indefinite
+  
+  schedule        String   @default("weekly") // daily, weekly, monthly
+  enabled         Boolean  @default(true)
+  lastExportAt    DateTime?
+  lastError       String?
+  exportCount     Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  teamId          String
+  team            Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([destination])
+  @@index([enabled])
+}
+
+model PermissionPolicy {
+  id              String   @id @default(cuid())
+  name            String   // e.g. "Test Runner", "Project Admin", "Viewer"
+  description     String?
+  isDefault       Boolean  @default(false) // System-defined vs custom
+  
+  // Permissions included in this policy
+  permissions     Json     @default("[]") // [{resource:"projects",actions:["read","write"]},{resource:"test_runs",actions:["read","execute"]}]
+  
+  // Conditions
+  conditions      Json?    // [{type:"time_of_day",start:"09:00",end:"18:00",timezone:"UTC"},{type:"ip_allowlist",ips:["10.0.0.0/8"]}]
+  
+  // Scope
+  scope           String   @default("team") // team, project, global
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  teamId          String?  // Null for global default policies
+  team            Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  resources       ResourcePermission[]
+
+  @@index([teamId])
+  @@index([scope])
+  @@index([isDefault])
+}
+
+model ResourcePermission {
+  id              String   @id @default(cuid())
+  resourceType    String   // project, test_run, feature, etc.
+  resourceId      String   // ID of the resource
+  userId          String   // User who has this permission
+  policyId        String?  // Permission policy applied
+  customActions   Json     @default("[]") // Override actions: ["read","write","delete"]
+  
+  // Delegated admin
+  delegatedBy     String?  // User ID who delegated
+  delegatedAt     DateTime?
+  expiresAt       DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  policy          PermissionPolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceType, resourceId, userId])
+  @@index([resourceType, resourceId])
+  @@index([userId])
+  @@index([policyId])
+  @@index([expiresAt])
 }

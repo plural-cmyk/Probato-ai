@@ -1500,3 +1500,63 @@ Stage Summary:
 - Test code auto-maintenance scans 4 categories: deprecation, assertion_drift, step_staleness, code_quality
 - 8 new API routes, 2 new Prisma models, 1 new agent, 1 new UI panel
 - 644 total tests passing (28 new for M29/M30)
+
+---
+Task ID: 2b
+Agent: M32 Agent
+Task: Milestone 32 — Enterprise SSO, Audit & Compliance, RBAC v2
+
+Work Log:
+- Added 5 new Prisma models to schema.prisma: SSOConfiguration, AuditLog, AuditLogExport, PermissionPolicy, ResourcePermission
+- Added relations: User → resourcePermissions, Team → ssoConfiguration/auditLogs/auditLogExports/permissionPolicies
+- Created audit helper utility (src/lib/audit.ts) with SHA-256 hash chain computation
+- Created SSO API routes (4 routes):
+  - /api/sso/config — GET (list) / POST (create)
+  - /api/sso/config/[id] — GET / PATCH / DELETE
+  - /api/sso/metadata — GET SP metadata (SAML XML or OIDC discovery)
+  - /api/sso/callback — POST SSO authentication callback (SAML/OIDC validation, auto-provision, group-to-role mapping)
+- Created Audit API routes (5 routes):
+  - /api/audit/logs — GET with filters (action, resource, userId, dateRange, severity) and cursor pagination
+  - /api/audit/logs/[id] — GET specific entry
+  - /api/audit/exports — GET / POST export configurations
+  - /api/audit/exports/[id] — GET / PATCH / DELETE
+  - /api/audit/verify — POST verify hash chain integrity (iterates all entries, recomputes hashes, reports tampering)
+- Created Permissions API routes (3 routes):
+  - /api/permissions/policies — GET / POST (auto-seeds 5 default policies on first use)
+  - /api/permissions/policies/[id] — GET / PATCH / DELETE (default policies only allow conditions/description updates)
+  - /api/permissions/check — POST permission check (resolves from team role → policies → resource overrides → global policies)
+- Created SSO Config Panel component (src/components/sso-config-panel.tsx):
+  - List/create/edit/delete SSO configurations per team
+  - SAML and OIDC protocol support with protocol-specific form fields
+  - Test Connection and SP Metadata display
+  - Domain restrictions and auto-provisioning toggles
+- Created Audit Log Panel component (src/components/audit-log-panel.tsx):
+  - Filterable audit log table (action, resource, severity, date range)
+  - Expandable entries with before/after snapshots and metadata
+  - Verify Chain Integrity button with results display
+  - Export configuration management (create/delete)
+  - Cursor-based pagination (Load More)
+  - Severity color coding with icons
+- Created RBAC Panel component (src/components/rbac-panel.tsx):
+  - List permission policies with permissions breakdown (resource → action badges)
+  - Create custom policy form with permissions builder
+  - Default policies display (non-deletable)
+  - Permission check tool: input userId + resource + action, get allowed/denied result with source
+  - Auto-seeds 5 default policies: Full Access, Test Runner, Project Admin, Viewer, Billing Admin
+- Integrated 3 M32 panels into dashboard:
+  - Added Shield (SSO), FileSearch (Audit), Users (RBAC) buttons in nav bar
+  - Added panel rendering sections for SSO Config, Audit Log, and RBAC
+  - Added state variables for showSSOConfigPanel, showAuditLogPanel, showRBACPanel
+- Prisma client generated successfully
+- Dev server running without errors
+- No new lint errors introduced (all pre-existing)
+
+Stage Summary:
+- ✅ Milestone 32 COMPLETE — Enterprise SSO, Audit & Compliance, RBAC v2
+- 5 new Prisma models: SSOConfiguration, AuditLog, AuditLogExport, PermissionPolicy, ResourcePermission
+- 12 new API routes: 4 SSO, 5 Audit, 3 Permissions
+- Audit log with tamper-evident SHA-256 hash chain
+- SSO supports SAML 2.0 and OpenID Connect protocols
+- RBAC with 5 default policies + custom policy creation + permission check tool
+- 3 dashboard panels: SSO Config, Audit Log, RBAC
+- All new code properly typed with TypeScript
