@@ -1238,3 +1238,40 @@ Stage Summary:
 - Phase 4 progress: 2/4 milestones done (M21 ✅, M22 ✅, M23 🔲, M24 🔲)
 - Key files modified: media-verifier.ts, media/verify/route.ts, media-verification-panel.tsx, plans.ts
 - No new Prisma migration needed (audioScore and audioChecks fields already existed)
+
+---
+Task ID: M23
+Agent: main
+Task: Implement Active Security Agent v1 (XSS & Auth Probing)
+
+Work Log:
+- Explored codebase: reviewed security-scanner.ts (passive), media-verifier.ts, plans.ts, schema.prisma, security-scan-panel.tsx, project page
+- Added SecurityProbe model to prisma/schema.prisma with xssScore, authScore, xssFindings, authFindings, payloadsTested, authEndpoints
+- Added securityProbe relations to User, Project, and TestRun models
+- Added "security_probe" CreditAction (6 credits/use) to plans.ts
+- Created src/lib/agent/security-prober.ts (880+ lines) with:
+  - Reflected XSS testing via URL params + form inputs
+  - DOM-based XSS detection (dangerous sinks: innerHTML, document.write, eval, etc.)
+  - DOM source detection (location.hash, location.search, document.referrer)
+  - Stored XSS indicator detection (content-editable, rich text editors, user content areas)
+  - Auth probing: CSRF detection, session cookie analysis, open redirect testing, rate limit testing
+  - Safe non-exploitative test payloads (15 benign markers)
+  - 3-tier LLM strategy (z-ai → external API → rule-based fallback)
+  - Probe depth options: quick, standard, deep
+  - Full credit check/deduct, notification dispatch, DB persistence pipeline
+- Created API routes: POST /api/security/probe, GET /api/security/probes, GET /api/security/probes/[id]
+- Created security-probe-panel.tsx with:
+  - 3 score circles (Overall, XSS, Auth)
+  - XSS/Auth tab filter, depth selector (quick/standard/deep)
+  - XSSFindingCard + AuthFindingCard with expandable details
+  - Reflected/sanitized badges, payload/evidence display
+  - Recommendations section, probe history
+- Integrated SecurityProbePanel into project detail page (2-col grid with SecurityScanPanel)
+- Build: zero errors, all new routes confirmed
+- Pushed to main: commit 75d2280
+
+Stage Summary:
+- M23 complete: Active Security Agent v1 with XSS & Auth probing
+- 8 files changed, 2721 insertions
+- New routes: /api/security/probe, /api/security/probes, /api/security/probes/[id]
+- Phase 4 progress: M21✅ M22✅ M23✅ M24⏳
