@@ -86,6 +86,7 @@ model User {
   orchestratedSessions   OrchestratedSession[]
   messagingTestSessions  MessagingTestSession[]
   callFlowTestSessions  CallFlowTestSession[]
+  paymentFlowTestSessions PaymentFlowTestSession[]
   onboardingState        OnboardingState?
   teamMemberships        TeamMember[]
   sentInvitations        TeamInvitation[]  @relation("SentInvitations")
@@ -130,6 +131,7 @@ model Project {
   orchestratedSessions OrchestratedSession[]
   messagingTestSessions MessagingTestSession[]
   callFlowTestSessions CallFlowTestSession[]
+  paymentFlowTestSessions PaymentFlowTestSession[]
   comments        Comment[]
   sharedWith      SharedProject[]
 
@@ -187,6 +189,7 @@ model TestRun {
   orchestratedSessions OrchestratedSession[]
   messagingTestSessions MessagingTestSession[]
   callFlowTestSessions CallFlowTestSession[]
+  paymentFlowTestSessions PaymentFlowTestSession[]
   comments        Comment[]
 
   @@index([projectId])
@@ -1029,6 +1032,7 @@ model OrchestratedSession {
   syncEvents      SyncEvent[]
   messagingTest   MessagingTestSession?
   callFlowTest    CallFlowTestSession?
+  paymentFlowTest PaymentFlowTestSession?
 
   @@index([userId])
   @@index([projectId])
@@ -1163,6 +1167,53 @@ model CallFlowTestSession {
 
   testRunId           String?
   testRun             TestRun?  @relation(fields: [testRunId], references: [id], onDelete: SetNull)
+
+  orchestratedSessionId String?  @unique
+  orchestratedSession   OrchestratedSession? @relation(fields: [orchestratedSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================
+// Phase 5: Payment Flow Testing (M28)
+// ============================================
+
+model PaymentFlowTestSession {
+  id                    String    @id @default(cuid())
+  status                String    @default("pending")  // pending, running, completed, failed
+  url                   String    // Target URL for the payment/checkout app
+  testCard              String    @default("4242424242424242") // Stripe test card used
+  expectedOutcome       String    @default("success")  // success, decline, insufficient_funds, 3ds, processing_error, webhook, multi_currency
+  actualOutcome         String?                         // Actual outcome observed
+  errorMessage          String?                         // Error message if payment failed
+  paymentScore          Int       @default(0)           // 0-100 overall payment reliability score
+  checkoutCompletionRate Float    @default(0)           // 0-1 ratio of checkout steps completed
+  webhookDeliveryMs     Int       @default(0)           // Webhook delivery latency in ms (avg)
+  webhookDeliveryMsP95  Int       @default(0)           // Webhook delivery p95 latency in ms
+  paymentResults       Json      @default("[]")        // Array of per-scenario payment results
+  checkoutSteps        Json      @default("[]")        // Array of CheckoutStepResult objects
+  webhookChecks        Json      @default("[]")        // Array of WebhookCheckResult objects
+  findings             Json      @default("[]")        // Aggregated findings
+  recommendations      Json      @default("[]")        // Array of recommendation strings
+  llmUsed              Boolean   @default(false)
+  duration             Int       @default(0)           // Total test duration in ms
+  error                String?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  projectId            String?
+  project              Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testRunId            String?
+  testRun              TestRun?  @relation(fields: [testRunId], references: [id], onDelete: SetNull)
 
   orchestratedSessionId String?  @unique
   orchestratedSession   OrchestratedSession? @relation(fields: [orchestratedSessionId], references: [id], onDelete: SetNull)

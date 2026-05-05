@@ -402,10 +402,11 @@ describe("Credit Calculation Scenarios", () => {
     expect(totalMinutes).toBe(100);
   });
 
-  it("orchestrated_test and messaging_test are the most expensive actions at 12 credits", () => {
+  it("payment_flow_test is the most expensive action at 15 credits", () => {
     const allCosts = Object.values(CREDIT_COSTS).map((c) => c.credits);
     const maxCost = Math.max(...allCosts);
-    expect(maxCost).toBe(12);
+    expect(maxCost).toBe(15);
+    expect(CREDIT_COSTS.payment_flow_test.credits).toBe(15);
     expect(CREDIT_COSTS.orchestrated_test.credits).toBe(12);
     expect(CREDIT_COSTS.messaging_test.credits).toBe(12);
   });

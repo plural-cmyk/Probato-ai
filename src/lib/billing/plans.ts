@@ -166,7 +166,8 @@ export type CreditAction =
   | "media_verification"
   | "orchestrated_test"
   | "messaging_test"
-  | "call_flow_test";
+  | "call_flow_test"
+  | "payment_flow_test";
 
 export interface CreditCostDefinition {
   action: CreditAction;
@@ -281,6 +282,13 @@ export const CREDIT_COSTS: Record<CreditAction, CreditCostDefinition> = {
     unit: "per session",
     description: "Cross-device call flow test (caller/callee agents with dial-answer-hangup verification)",
     estimatedCostUsd: 0.40,
+  },
+  payment_flow_test: {
+    action: "payment_flow_test",
+    credits: 15,
+    unit: "per session",
+    description: "Payment flow test (Stripe test mode checkout with card scenarios, webhook verification, multi-currency)",
+    estimatedCostUsd: 0.50,
   },
 };
 

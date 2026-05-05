@@ -26,7 +26,8 @@ export type NotificationType =
   | "fix_suggestion"
   | "webhook_received"
   | "security_issue"
-  | "a11y_issue";
+  | "a11y_issue"
+  | "payment_flow";
 
 export type NotificationPriority = "low" | "normal" | "high" | "critical";
 
@@ -79,6 +80,7 @@ const DEFAULT_PREFERENCES: Record<NotificationType, { inApp: boolean; email: boo
   webhook_received:    { inApp: true,  email: false, slack: false, webhook: false },
   security_issue:      { inApp: true,  email: true,  slack: true,  webhook: false },
   a11y_issue:          { inApp: true,  email: false, slack: true,  webhook: false },
+  payment_flow:        { inApp: true,  email: false, slack: true,  webhook: false },
 };
 
 // ── Main Dispatcher ────────────────────────────────────────────────
@@ -279,7 +281,7 @@ export async function ensureUserPreferences(userId: string): Promise<{
   const eventTypes: NotificationType[] = [
     "test_pass", "test_fail", "test_error", "visual_diff",
     "schedule_complete", "auto_heal", "fix_suggestion", "webhook_received",
-    "security_issue", "a11y_issue",
+    "security_issue", "a11y_issue", "payment_flow",
   ];
 
   const prefs = [];
@@ -598,6 +600,7 @@ function getNotificationEmoji(type: NotificationType): string {
     webhook_received: "🔗",
     security_issue: "🛡️",
     a11y_issue: "♿",
+    payment_flow: "💳",
   };
   return emojiMap[type] ?? "🔔";
 }
@@ -614,6 +617,7 @@ function getNotificationColor(type: NotificationType): string {
     webhook_received: "#6b7280",
     security_issue: "#ef4444",
     a11y_issue: "#f59e0b",
+    payment_flow: "#10b981",
   };
   return colorMap[type] ?? "#6c3ce1";
 }
@@ -633,6 +637,7 @@ export function getNotificationTypeDescription(type: NotificationType): string {
     webhook_received: "When a GitHub webhook event is received",
     security_issue: "When a security vulnerability is detected",
     a11y_issue: "When an accessibility violation is detected",
+    payment_flow: "When a payment flow test completes",
   };
   return descriptions[type] ?? type;
 }
