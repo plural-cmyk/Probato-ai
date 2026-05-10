@@ -125,6 +125,8 @@ interface Project {
   name: string;
   repoUrl: string;
   repoName: string;
+  liveUrl: string | null;
+  source: string; // "repo" or "url"
   status: string;
   branch: string;
   sandboxId: string | null;
@@ -217,8 +219,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [projectSource, setProjectSource] = useState<"repo" | "url">("url");
   const [repoUrl, setRepoUrl] = useState("");
   const [repoName, setRepoName] = useState("");
+  const [liveUrl, setLiveUrl] = useState("");
   const [branch, setBranch] = useState("main");
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [sandboxStatus, setSandboxStatus] = useState<SandboxStatus | null>(null);
@@ -567,32 +571,53 @@ export default function DashboardPage() {
   }, [status, fetchProjects]);
 
   async function createProject() {
-    if (!repoUrl.trim()) return;
-
     setCreating(true);
     try {
-      // Auto-extract repo name from URL if not provided
-      const name =
-        repoName.trim() ||
-        repoUrl
-          .replace(/\.git$/, "")
-          .split("/")
-          .pop() ||
-        "untitled";
+      if (projectSource === "url") {
+        // URL-based project: user provides a live URL
+        if (!liveUrl.trim()) return;
+        const res = await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            liveUrl: liveUrl.trim(),
+            source: "url",
+            repoName: repoName.trim() || undefined,
+          }),
+        });
 
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoUrl, repoName: name, branch }),
-      });
+        if (res.ok) {
+          const data = await res.json();
+          setProjects((prev) => [data.project, ...prev]);
+          setDialogOpen(false);
+          setLiveUrl("");
+          setRepoName("");
+        }
+      } else {
+        // Repo-based project: user provides a GitHub repo URL
+        if (!repoUrl.trim()) return;
+        const name =
+          repoName.trim() ||
+          repoUrl
+            .replace(/\.git$/, "")
+            .split("/")
+            .pop() ||
+          "untitled";
 
-      if (res.ok) {
-        const data = await res.json();
-        setProjects((prev) => [data.project, ...prev]);
-        setDialogOpen(false);
-        setRepoUrl("");
-        setRepoName("");
-        setBranch("main");
+        const res = await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ repoUrl, repoName: name, branch }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setProjects((prev) => [data.project, ...prev]);
+          setDialogOpen(false);
+          setRepoUrl("");
+          setRepoName("");
+          setBranch("main");
+        }
       }
     } catch (error) {
       console.error("Failed to create project:", error);
@@ -3127,55 +3152,123 @@ export default function DashboardPage() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Connect a Repository</DialogTitle>
+                <DialogTitle>New Project</DialogTitle>
                 <DialogDescription>
-                  Enter the GitHub repository URL to connect. Probato will clone
-                  it and prepare a sandboxed environment.
+                  Add your app by providing a live URL (no setup needed) or by connecting a GitHub repository.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="repo-url">Repository URL</Label>
-                  <Input
-                    id="repo-url"
-                    placeholder="https://github.com/owner/repo"
-                    value={repoUrl}
-                    onChange={(e) => setRepoUrl(e.target.value)}
-                  />
+                {/* Source Toggle */}
+                <div className="flex rounded-lg border border-border overflow-hidden">
+                  <button
+                    type="button"
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
+                      projectSource === "url"
+                        ? "bg-deep-indigo text-white"
+                        : "bg-transparent text-muted-foreground hover:bg-muted"
+                    }`}
+                    onClick={() => setProjectSource("url")}
+                  >
+                    <Globe className="h-4 w-4" />
+                    Live URL
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
+                      projectSource === "repo"
+                        ? "bg-deep-indigo text-white"
+                        : "bg-transparent text-muted-foreground hover:bg-muted"
+                    }`}
+                    onClick={() => setProjectSource("repo")}
+                  >
+                    <Github className="h-4 w-4" />
+                    Git Repository
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="repo-name">Project Name (optional)</Label>
-                  <Input
-                    id="repo-name"
-                    placeholder="Auto-detected from URL"
-                    value={repoName}
-                    onChange={(e) => setRepoName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="branch">Branch</Label>
-                  <Select value={branch} onValueChange={setBranch}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="main">main</SelectItem>
-                      <SelectItem value="master">master</SelectItem>
-                      <SelectItem value="develop">develop</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                {projectSource === "url" ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="live-url">App URL</Label>
+                      <Input
+                        id="live-url"
+                        placeholder="https://my-app.vercel.app"
+                        value={liveUrl}
+                        onChange={(e) => setLiveUrl(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="url-project-name">Project Name (optional)</Label>
+                      <Input
+                        id="url-project-name"
+                        placeholder="Auto-detected from URL"
+                        value={repoName}
+                        onChange={(e) => setRepoName(e.target.value)}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      The app will be tested directly at the URL you provide. No Docker or repo cloning needed.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="repo-url">Repository URL</Label>
+                      <Input
+                        id="repo-url"
+                        placeholder="https://github.com/owner/repo"
+                        value={repoUrl}
+                        onChange={(e) => setRepoUrl(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="repo-name">Project Name (optional)</Label>
+                      <Input
+                        id="repo-name"
+                        placeholder="Auto-detected from URL"
+                        value={repoName}
+                        onChange={(e) => setRepoName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="branch">Branch</Label>
+                      <Select value={branch} onValueChange={setBranch}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="main">main</SelectItem>
+                          <SelectItem value="master">master</SelectItem>
+                          <SelectItem value="develop">develop</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Probato will clone the repo and launch a sandboxed environment. Requires Docker.
+                    </p>
+                  </>
+                )}
+
                 <Button
                   className="w-full bg-deep-indigo hover:bg-deep-indigo/90 text-white"
                   onClick={createProject}
-                  disabled={creating || !repoUrl.trim()}
+                  disabled={
+                    creating ||
+                    (projectSource === "url" ? !liveUrl.trim() : !repoUrl.trim())
+                  }
                 >
                   {creating ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : projectSource === "url" ? (
+                    <Globe className="mr-2 h-4 w-4" />
                   ) : (
                     <Github className="mr-2 h-4 w-4" />
                   )}
-                  {creating ? "Connecting..." : "Connect Repository"}
+                  {creating
+                    ? "Adding..."
+                    : projectSource === "url"
+                    ? "Add App"
+                    : "Connect Repository"}
                 </Button>
               </div>
             </DialogContent>
@@ -3220,9 +3313,13 @@ export default function DashboardPage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
-                        <Github className="h-4 w-4 text-muted-foreground" />
+                        {project.source === "url" ? (
+                          <Globe className="h-4 w-4 text-electric-violet" />
+                        ) : (
+                          <Github className="h-4 w-4 text-muted-foreground" />
+                        )}
                         <CardTitle className="text-base">
-                          {project.repoName}
+                          {project.name || project.repoName}
                         </CardTitle>
                       </div>
                       <Badge
@@ -3236,7 +3333,9 @@ export default function DashboardPage() {
                       </Badge>
                     </div>
                     <CardDescription className="text-xs font-mono">
-                      {project.branch}
+                      {project.source === "url" && project.liveUrl
+                        ? project.liveUrl
+                        : project.branch}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

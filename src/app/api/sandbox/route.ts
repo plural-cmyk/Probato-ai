@@ -8,26 +8,13 @@ import {
 } from "@/lib/sandbox/docker";
 
 // POST /api/sandbox — Create a sandbox for a project
+// URL-based projects (source="url") skip Docker entirely — they're already running
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Check Docker availability
-    const dockerReady = await isDockerAvailable();
-    if (!dockerReady) {
-      return NextResponse.json(
-        {
-          error: "Docker is not available",
-          message:
-            "The Docker daemon is not reachable. Ensure Docker is running locally, or set DOCKER_HOST for a remote Docker host.",
-          hint: "For local dev: install Docker Desktop. For production: set DOCKER_HOST env var to your Docker host.",
-        },
-        { status: 503 }
-      );
     }
 
     const body = await request.json();
@@ -49,6 +36,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Project not found" },
         { status: 404 }
+      );
+    }
+
+    // URL-based projects: already running, no Docker needed
+    if (project.source === "url" && project.liveUrl) {
+      return NextResponse.json({
+        sandbox: {
+          containerId: null,
+          name: project.name,
+          status: "running",
+          url: project.liveUrl,
+          type: "url-based",
+        },
+      });
+    }
+
+    // Repo-based projects: need Docker sandbox
+    const dockerReady = await isDockerAvailable();
+    if (!dockerReady) {
+      return NextResponse.json(
+        {
+          error: "Docker is not available",
+          message:
+            "The Docker daemon is not reachable. For URL-based testing (no Docker needed), create a project with a live URL instead.",
+          hint: "For local dev: install Docker Desktop. For production: set DOCKER_HOST env var. Or use URL-based testing by providing a live URL.",
+        },
+        { status: 503 }
       );
     }
 

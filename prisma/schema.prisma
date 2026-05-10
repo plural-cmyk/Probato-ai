@@ -103,10 +103,12 @@ model User {
 model Project {
   id          String   @id @default(cuid())
   name        String
-  repoUrl     String
-  repoName    String
+  repoUrl     String   @default("")
+  repoName    String   @default("")
+  liveUrl     String?  // Live URL for URL-based testing (no Docker needed)
+  source      String   @default("repo") // "repo" or "url" — how the project was created
   branch      String   @default("main")
-  status      String   @default("pending") // pending, cloning, ready, error
+  status      String   @default("pending") // pending, cloning, ready, running, error
   sandboxId   String?  // Docker container ID
   sandboxUrl  String?  // URL where sandboxed app is accessible
   lastRunAt   DateTime?

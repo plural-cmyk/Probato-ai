@@ -27,7 +27,7 @@ export async function GET() {
   }
 }
 
-// POST /api/projects — Create a new project
+// POST /api/projects — Create a new project (repo-based or URL-based)
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -37,11 +37,45 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { repoUrl, repoName, branch } = body;
+    const { repoUrl, repoName, branch, liveUrl, source } = body;
 
+    // Two creation paths:
+    // 1. URL-based: source="url", liveUrl required → instant "running" status
+    // 2. Repo-based: source="repo" (default), repoUrl + repoName required → "pending" status
+
+    if (source === "url" || liveUrl) {
+      // URL-based project: user provides a live URL, no Docker needed
+      if (!liveUrl || !liveUrl.trim()) {
+        return NextResponse.json(
+          { error: "liveUrl is required for URL-based projects" },
+          { status: 400 }
+        );
+      }
+
+      const projectName =
+        repoName?.trim() ||
+        new URL(liveUrl.startsWith("http") ? liveUrl : `https://${liveUrl}`).hostname.replace(/^www\./, "");
+
+      const project = await db.project.create({
+        data: {
+          name: projectName,
+          repoUrl: "",
+          repoName: "",
+          liveUrl: liveUrl.trim(),
+          source: "url",
+          status: "running", // URL-based projects are immediately ready
+          branch: "main",
+          userId: session.user.id,
+        },
+      });
+
+      return NextResponse.json({ project }, { status: 201 });
+    }
+
+    // Repo-based project: user provides a GitHub repo URL
     if (!repoUrl || !repoName) {
       return NextResponse.json(
-        { error: "repoUrl and repoName are required" },
+        { error: "repoUrl and repoName are required for repo-based projects" },
         { status: 400 }
       );
     }
@@ -51,8 +85,9 @@ export async function POST(request: NextRequest) {
         name: repoName,
         repoUrl,
         repoName,
-        branch: branch ?? "main",
+        source: "repo",
         status: "pending",
+        branch: branch ?? "main",
         userId: session.user.id,
       },
     });

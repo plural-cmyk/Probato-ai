@@ -107,6 +107,8 @@ export default function OnboardingPage() {
   const [connecting, setConnecting] = useState(false);
   const [repoError, setRepoError] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectSource, setProjectSource] = useState<"repo" | "url">("url");
+  const [liveUrl, setLiveUrl] = useState("");
 
   // Step 3 state
   const [discovering, setDiscovering] = useState(false);
@@ -215,26 +217,40 @@ export default function OnboardingPage() {
   // ── Step 2: Connect Repo ─────────────────────────────────────────
 
   async function handleConnectRepo() {
-    if (!repoUrl.trim()) {
-      setRepoError("Please enter a repository URL");
-      return;
-    }
-
     setConnecting(true);
     setRepoError("");
 
     try {
-      const name = extractRepoName(repoUrl);
+      let res: Response;
 
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoUrl: repoUrl.trim(), repoName: name, branch: branch.trim() || "main" }),
-      });
+      if (projectSource === "url") {
+        if (!liveUrl.trim()) {
+          setRepoError("Please enter a live URL");
+          setConnecting(false);
+          return;
+        }
+        res = await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ liveUrl: liveUrl.trim(), source: "url" }),
+        });
+      } else {
+        if (!repoUrl.trim()) {
+          setRepoError("Please enter a repository URL");
+          setConnecting(false);
+          return;
+        }
+        const name = extractRepoName(repoUrl);
+        res = await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ repoUrl: repoUrl.trim(), repoName: name, branch: branch.trim() || "main" }),
+        });
+      }
 
       if (!res.ok) {
         const data = await res.json();
-        setRepoError(data.error || "Failed to connect repository");
+        setRepoError(data.error || "Failed to create project");
         return;
       }
 
@@ -242,7 +258,7 @@ export default function OnboardingPage() {
       const newProjectId = data.project.id;
       setProjectId(newProjectId);
 
-      await completeStep("connect_repo", { repoUrl: repoUrl.trim(), projectId: newProjectId });
+      await completeStep("connect_repo", { repoUrl: projectSource === "url" ? liveUrl.trim() : repoUrl.trim(), projectId: newProjectId });
       goToStep("discover");
     } catch (err) {
       setRepoError("An unexpected error occurred. Please try again.");
@@ -469,34 +485,82 @@ export default function OnboardingPage() {
               <Github className="size-6 text-deep-indigo" />
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-deep-indigo">Connect Your Repository</h2>
-          <p className="text-muted-foreground mt-1">Link your GitHub repo to start testing</p>
+          <h2 className="text-2xl font-bold text-deep-indigo">Add Your App</h2>
+          <p className="text-muted-foreground mt-1">Provide a live URL (fastest) or connect a GitHub repo</p>
         </div>
 
         <div className="space-y-4 max-w-md mx-auto">
-          <div className="space-y-2">
-            <Label htmlFor="repoUrl">GitHub Repository URL</Label>
-            <Input
-              id="repoUrl"
-              placeholder="https://github.com/user/repo"
-              value={repoUrl}
-              onChange={(e) => {
-                setRepoUrl(e.target.value);
-                setRepoError("");
-              }}
-              className="h-11"
-            />
+          {/* Source Toggle */}
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            <button
+              type="button"
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
+                projectSource === "url"
+                  ? "bg-deep-indigo text-white"
+                  : "bg-transparent text-muted-foreground hover:bg-muted"
+              }`}
+              onClick={() => { setProjectSource("url"); setRepoError(""); }}
+            >
+              <Globe className="h-4 w-4" />
+              Live URL
+            </button>
+            <button
+              type="button"
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
+                projectSource === "repo"
+                  ? "bg-deep-indigo text-white"
+                  : "bg-transparent text-muted-foreground hover:bg-muted"
+              }`}
+              onClick={() => { setProjectSource("repo"); setRepoError(""); }}
+            >
+              <Github className="h-4 w-4" />
+              Git Repository
+            </button>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="branch">Branch</Label>
-            <Input
-              id="branch"
-              placeholder="main"
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-              className="h-11"
-            />
-          </div>
+
+          {projectSource === "url" ? (
+            <div className="space-y-2">
+              <Label htmlFor="liveUrl">App URL</Label>
+              <Input
+                id="liveUrl"
+                placeholder="https://my-app.vercel.app"
+                value={liveUrl}
+                onChange={(e) => {
+                  setLiveUrl(e.target.value);
+                  setRepoError("");
+                }}
+                className="h-11"
+              />
+              <p className="text-xs text-muted-foreground">No Docker needed. The app will be tested directly at this URL.</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="repoUrl">GitHub Repository URL</Label>
+                <Input
+                  id="repoUrl"
+                  placeholder="https://github.com/user/repo"
+                  value={repoUrl}
+                  onChange={(e) => {
+                    setRepoUrl(e.target.value);
+                    setRepoError("");
+                  }}
+                  className="h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="branch">Branch</Label>
+                <Input
+                  id="branch"
+                  placeholder="main"
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  className="h-11"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Probato will clone the repo and launch a sandboxed environment. Requires Docker.</p>
+            </>
+          )}
 
           {repoError && (
             <div className="flex items-center gap-2 text-sm text-warm-red bg-warm-red/10 rounded-lg p-3">
@@ -508,7 +572,7 @@ export default function OnboardingPage() {
           <div className="flex items-center gap-3 pt-2">
             <Button
               onClick={handleConnectRepo}
-              disabled={connecting || !repoUrl.trim()}
+              disabled={connecting || (projectSource === "url" ? !liveUrl.trim() : !repoUrl.trim())}
               className="bg-electric-violet hover:bg-electric-violet/90 text-white flex-1 gap-2"
             >
               {connecting ? (

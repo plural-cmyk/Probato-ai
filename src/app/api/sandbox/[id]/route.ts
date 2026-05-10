@@ -10,6 +10,7 @@ import {
 } from "@/lib/sandbox/docker";
 
 // GET /api/sandbox/[id] — Get sandbox status + logs
+// URL-based projects return their live status without checking Docker
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -32,6 +33,29 @@ export async function GET(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    // URL-based project: return live status without Docker
+    if (project.source === "url" && project.liveUrl) {
+      return NextResponse.json({
+        status: "running",
+        project: {
+          id: project.id,
+          name: project.name,
+          status: project.status,
+          sandboxUrl: project.liveUrl,
+          source: "url",
+        },
+        sandbox: {
+          containerId: null,
+          name: project.name,
+          status: "running",
+          url: project.liveUrl,
+          type: "url-based",
+        },
+        logs: "URL-based project — no Docker container. App is accessible at the live URL.",
+      });
+    }
+
+    // Repo-based project: check Docker
     if (!project.sandboxId) {
       return NextResponse.json({
         status: "no_sandbox",
@@ -73,6 +97,7 @@ export async function GET(
 }
 
 // DELETE /api/sandbox/[id] — Stop and destroy a sandbox
+// URL-based projects have nothing to destroy
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -93,6 +118,14 @@ export async function DELETE(
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // URL-based project: nothing to destroy, just reset status
+    if (project.source === "url") {
+      return NextResponse.json({
+        destroyed: true,
+        message: "URL-based project has no sandbox to destroy",
+      });
     }
 
     if (!project.sandboxId) {

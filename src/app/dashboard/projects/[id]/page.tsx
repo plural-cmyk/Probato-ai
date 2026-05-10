@@ -83,6 +83,8 @@ interface ProjectData {
     name: string;
     repoUrl: string;
     repoName: string;
+    liveUrl: string | null;
+    source: string;
     branch: string;
     status: string;
     sandboxId?: string | null;
@@ -153,7 +155,7 @@ export default function ProjectDetailPage() {
   async function discoverFeatures() {
     setDiscovering(true);
     try {
-      const url = data?.project.sandboxUrl || data?.project.repoUrl;
+      const url = data?.project.liveUrl || data?.project.sandboxUrl || data?.project.repoUrl;
       if (!url) return;
 
       await fetch("/api/discover", {
@@ -172,7 +174,7 @@ export default function ProjectDetailPage() {
   async function generateAllTests() {
     setGenerating(true);
     try {
-      const url = data?.project.sandboxUrl || data?.project.repoUrl;
+      const url = data?.project.liveUrl || data?.project.sandboxUrl || data?.project.repoUrl;
       await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -536,12 +538,12 @@ export default function ProjectDetailPage() {
           <SecurityScanPanel
             key={`security-${scanPanelKey}`}
             projectId={projectId}
-            url={project.sandboxUrl || project.repoUrl}
+            url={project.liveUrl || project.sandboxUrl || project.repoUrl}
           />
           <SecurityProbePanel
             key={`probe-${scanPanelKey}`}
             projectId={projectId}
-            url={project.sandboxUrl || project.repoUrl}
+            url={project.liveUrl || project.sandboxUrl || project.repoUrl}
           />
         </div>
 
@@ -550,12 +552,12 @@ export default function ProjectDetailPage() {
           <APIProbePanel
             key={`api-probe-${scanPanelKey}`}
             projectId={projectId}
-            url={project.sandboxUrl || project.repoUrl}
+            url={project.liveUrl || project.sandboxUrl || project.repoUrl}
           />
           <A11yAuditPanel
             key={`a11y-${scanPanelKey}`}
             projectId={projectId}
-            url={project.sandboxUrl || project.repoUrl}
+            url={project.liveUrl || project.sandboxUrl || project.repoUrl}
           />
         </div>
 
@@ -563,7 +565,7 @@ export default function ProjectDetailPage() {
         <div className="mt-8">
           <OrchestratorPanel
             projectId={projectId}
-            url={project.sandboxUrl || project.repoUrl}
+            url={project.liveUrl || project.sandboxUrl || project.repoUrl}
           />
         </div>
 
@@ -571,7 +573,7 @@ export default function ProjectDetailPage() {
         <div className="mt-8">
           <MessagingTestPanel
             projectId={projectId}
-            url={project.sandboxUrl || project.repoUrl}
+            url={project.liveUrl || project.sandboxUrl || project.repoUrl}
           />
         </div>
       </main>
