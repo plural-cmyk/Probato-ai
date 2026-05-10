@@ -97,3 +97,22 @@ Stage Summary:
 - Commit 606f5b2: "fix: M6 discovery always includes projectId"
 - Pushed to GitHub successfully
 - M1-M5 confirmed passing, M6 fix deployed
+
+---
+Task ID: 5
+Agent: Main
+Task: Grant credits for continued M7+ milestone testing
+
+Work Log:
+- User ran out of credits after M6 testing (free plan = 20 credits/month)
+- Checked DB: no CreditBalance or Subscription records existed
+- Created pro subscription (mock gateway) for user cmom1w3g90000l204uqyrcssz
+- Set credit balance to 10,000 credits (purchasedBalance: 9800, monthlyAllowance: 1000)
+- Recorded credit transaction for audit trail
+- Synced to both Supabase and Neon databases
+- Credit costs: feature_discovery=6, test_generation=5, test_execution=2/min, auto_heal=8
+
+Stage Summary:
+- User upgraded from free (20 credits) to pro plan with 10,000 credits
+- Both databases synced
+- Sufficient for ~1,666 discoveries, ~2,000 test generations, or ~5,000 test minutes
