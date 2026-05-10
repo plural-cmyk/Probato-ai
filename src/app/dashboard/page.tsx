@@ -333,6 +333,7 @@ export default function DashboardPage() {
     totalHealed: number;
     totalFailed: number;
     duration: number;
+    error?: string;
   } | null>(null);
   const [testOrder, setTestOrder] = useState<{
     levels: { id: string; name: string; type: string; priority: number }[][];
@@ -959,7 +960,13 @@ export default function DashboardPage() {
       const data = await res.json();
       const failedRun = data.runs?.find((r: { status: string }) => r.status === "failed" || r.status === "error");
       if (!failedRun) {
-        setAutoHealResult({ healed: false, totalHealed: 0, totalFailed: 0, duration: 0 });
+        setAutoHealResult({
+          healed: false,
+          totalHealed: 0,
+          totalFailed: 0,
+          duration: 0,
+          error: "No failed test run found. Run a test first, then auto-heal can repair broken selectors.",
+        });
         setAutoHealing(false);
         return;
       }
@@ -976,12 +983,25 @@ export default function DashboardPage() {
           totalHealed: healData.report?.totalHealed ?? 0,
           totalFailed: healData.report?.totalFailed ?? 0,
           duration: healData.report?.duration ?? 0,
+          error: healData.report?.error,
         });
       } else {
-        setAutoHealResult({ healed: false, totalHealed: 0, totalFailed: 0, duration: 0 });
+        setAutoHealResult({
+          healed: false,
+          totalHealed: 0,
+          totalFailed: 0,
+          duration: 0,
+          error: healData.error || healData.details || "Auto-heal request failed",
+        });
       }
     } catch {
-      setAutoHealResult({ healed: false, totalHealed: 0, totalFailed: 0, duration: 0 });
+      setAutoHealResult({
+        healed: false,
+        totalHealed: 0,
+        totalFailed: 0,
+        duration: 0,
+        error: "Request failed — the function may have timed out.",
+      });
     } finally {
       setAutoHealing(false);
     }
@@ -2929,6 +2949,9 @@ export default function DashboardPage() {
                         <Badge variant="secondary" className="text-xs">{autoHealResult.totalHealed} selector(s) healed</Badge>
                         <Badge variant="secondary" className="text-xs text-muted-foreground">{(autoHealResult.duration / 1000).toFixed(1)}s</Badge>
                       </div>
+                      {autoHealResult.error && (
+                        <p className="text-xs text-amber mt-2">{autoHealResult.error}</p>
+                      )}
                       {autoHealResult.totalFailed > 0 && (
                         <p className="text-xs text-warm-red mt-2">{autoHealResult.totalFailed} selector(s) could not be healed automatically</p>
                       )}
