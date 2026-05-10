@@ -76,3 +76,24 @@ Stage Summary:
 - 11 files changed, 30 insertions, 32 deletions
 - Dashboard now loads successfully (confirmed HTTP 200)
 - Push to GitHub pending (needs PAT authentication)
+
+---
+Task ID: 3
+Agent: Main
+Task: Fix M6 Feature Discovery: 'projectId is required' 400 error
+
+Work Log:
+- Identified the bug: dashboard discoverPageFeatures() sent projectId conditionally
+- The discoverProjectId state was initialized as "" and only included in body if non-empty
+- The /api/discover route hard-requires projectId (line 29-33)
+- Onboarding page and project detail page always send projectId (no issue there)
+- Fixed by: auto-populating discoverProjectId from projects[0].id on fetch
+- Also auto-select newly created project for discovery
+- Always include projectId in the request (fallback to projects[0].id)
+- Show clear error if no project exists
+- Disable Discover button when no project available
+
+Stage Summary:
+- Commit 606f5b2: "fix: M6 discovery always includes projectId"
+- Pushed to GitHub successfully
+- M1-M5 confirmed passing, M6 fix deployed
