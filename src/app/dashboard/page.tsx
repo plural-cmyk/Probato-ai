@@ -535,7 +535,12 @@ export default function DashboardPage() {
       const res = await fetch("/api/projects");
       if (res.ok) {
         const data = await res.json();
-        setProjects(data.projects ?? []);
+        const fetched = data.projects ?? [];
+        setProjects(fetched);
+        // Auto-populate discoverProjectId with the first project if not set
+        if (fetched.length > 0 && !discoverProjectId.trim()) {
+          setDiscoverProjectId(fetched[0].id);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch projects:", error);
@@ -589,6 +594,7 @@ export default function DashboardPage() {
         if (res.ok) {
           const data = await res.json();
           setProjects((prev) => [data.project, ...prev]);
+          setDiscoverProjectId(data.project.id); // Auto-select new project for discovery
           setDialogOpen(false);
           setLiveUrl("");
           setRepoName("");
@@ -613,6 +619,7 @@ export default function DashboardPage() {
         if (res.ok) {
           const data = await res.json();
           setProjects((prev) => [data.project, ...prev]);
+          setDiscoverProjectId(data.project.id); // Auto-select new project for discovery
           setDialogOpen(false);
           setRepoUrl("");
           setRepoName("");
@@ -824,18 +831,29 @@ export default function DashboardPage() {
 
   async function discoverPageFeatures() {
     if (!discoverUrl.trim()) return;
+    // Resolve projectId: use explicit input, or fall back to first project
+    const effectiveProjectId = discoverProjectId.trim() || (projects.length > 0 ? projects[0].id : "");
+    if (!effectiveProjectId) {
+      setDiscoverResult({
+        success: false,
+        page: { url: discoverUrl, title: "", forms: [], links: [], buttons: [], navigation: [], headings: [] },
+        features: [],
+        persistedCount: 0,
+        duration: 0,
+        error: "No project found — please create a project first before running discovery.",
+      });
+      return;
+    }
     setDiscovering(true);
     setDiscoverResult(null);
     setFeatureTestResult(null);
     try {
       const body: Record<string, string | boolean> = {
         url: discoverUrl,
+        projectId: effectiveProjectId,
         includeLLM: true,
+        clearExisting: true,
       };
-      if (discoverProjectId.trim()) {
-        body.projectId = discoverProjectId.trim();
-        body.clearExisting = true;
-      }
       const res = await fetch("/api/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2623,15 +2641,15 @@ export default function DashboardPage() {
                   onKeyDown={(e) => e.key === "Enter" && discoverPageFeatures()}
                 />
                 <Input
-                  placeholder="Project ID (optional, to save features)"
+                  placeholder="Project ID (auto-filled from your projects)"
                   value={discoverProjectId}
                   onChange={(e) => setDiscoverProjectId(e.target.value)}
-                  className="text-sm sm:w-[260px]"
+                  className="text-sm sm:w-[280px]"
                 />
                 <Button
                   className="bg-amber hover:bg-amber/90 text-white shrink-0"
                   onClick={discoverPageFeatures}
-                  disabled={discovering || !discoverUrl.trim()}
+                  disabled={discovering || !discoverUrl.trim() || (!discoverProjectId.trim() && projects.length === 0)}
                 >
                   {discovering ? (
                     <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
