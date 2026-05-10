@@ -33,3 +33,22 @@ Commits to push:
 2. 7cfcadf (session commit)
 3. 288da85 feat: Add dual-database support (Supabase primary + Neon secondary)
 4. deee1d7 chore: Remove SQLite DB from tracking, add to .gitignore
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Add Neon connection string and sync databases
+
+Work Log:
+- Added Neon connection string to .env as NEON_DATABASE_URL
+- Ran prisma db push against Neon — schema already in sync (had existing tables from previous sessions)
+- Verified both databases connected and operational
+- Neon had existing data: 2 users (Demo User + justus kimanzi), 1 project (GROUNDWORK-v2)
+- Synced all Neon data to Supabase — both databases now have identical data
+- Removed channel_binding=require from Neon URL for Prisma compatibility (used sslmode=require only)
+
+Stage Summary:
+- Supabase: 2 users, 1 project (synced from Neon)
+- Neon: 2 users, 1 project (original)
+- Both databases in sync and operational
+- Dual-write infrastructure ready (db-neon.ts + db-dual.ts)
