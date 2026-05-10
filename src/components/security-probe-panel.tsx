@@ -229,7 +229,7 @@ function XSSFindingCard({ finding }: { finding: XSSProbeFinding }) {
             <div className="rounded-md bg-zinc-50 dark:bg-zinc-800 p-2">
               <span className="font-medium text-gray-500">Payload:</span>
               <code className="block mt-0.5 text-gray-700 dark:text-gray-300 break-all">
-                {finding.payload.substring(0, 100)}
+                {(finding.payload ?? "").substring(0, 100)}
               </code>
             </div>
           </div>
@@ -238,7 +238,7 @@ function XSSFindingCard({ finding }: { finding: XSSProbeFinding }) {
             <div className="rounded-md bg-zinc-50 dark:bg-zinc-800 p-2">
               <span className="text-xs font-medium text-gray-500">Evidence:</span>
               <code className="block text-xs mt-0.5 text-gray-700 dark:text-gray-300 break-all">
-                {finding.evidence.substring(0, 300)}
+                {(finding.evidence ?? "").substring(0, 300)}
               </code>
             </div>
           )}
@@ -309,7 +309,7 @@ function AuthFindingCard({ finding }: { finding: AuthProbeFinding }) {
             <div className="rounded-md bg-zinc-50 dark:bg-zinc-800 p-2">
               <span className="font-medium text-gray-500">Endpoint:</span>
               <code className="block mt-0.5 text-gray-700 dark:text-gray-300 break-all">
-                {finding.endpoint.substring(0, 150)}
+                {(finding.endpoint ?? "").substring(0, 150)}
               </code>
             </div>
             <div className="rounded-md bg-zinc-50 dark:bg-zinc-800 p-2">
@@ -322,7 +322,7 @@ function AuthFindingCard({ finding }: { finding: AuthProbeFinding }) {
             <div className="rounded-md bg-zinc-50 dark:bg-zinc-800 p-2">
               <span className="text-xs font-medium text-gray-500">Evidence:</span>
               <code className="block text-xs mt-0.5 text-gray-700 dark:text-gray-300 break-all">
-                {finding.evidence.substring(0, 300)}
+                {(finding.evidence ?? "").substring(0, 300)}
               </code>
             </div>
           )}

@@ -210,7 +210,7 @@ function ViolationCard({ violation }: { violation: A11yViolation }) {
                 Element HTML
               </div>
               <pre className="px-2 py-1.5 text-xs font-mono overflow-x-auto max-h-24 bg-zinc-950 text-zinc-100">
-                {violation.elementHtml.substring(0, 500)}
+                {(violation.elementHtml ?? "").substring(0, 500)}
               </pre>
             </div>
           )}

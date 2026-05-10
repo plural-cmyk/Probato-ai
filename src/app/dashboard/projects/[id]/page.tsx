@@ -388,7 +388,7 @@ export default function ProjectDetailPage() {
                                   <details className="mt-1">
                                     <summary className="text-xs text-muted-foreground cursor-pointer">View Playwright code</summary>
                                     <pre className="mt-1 bg-zinc-950 text-zinc-100 p-2 rounded text-xs font-mono overflow-x-auto max-h-40">
-                                      {tc.code.substring(0, 1500)}
+                                      {(tc.code ?? "").substring(0, 1500)}
                                     </pre>
                                   </details>
                                 </div>
@@ -473,7 +473,7 @@ export default function ProjectDetailPage() {
                               <span className="text-xs text-muted-foreground shrink-0">{result.duration}ms</span>
                             )}
                             {result.error && (
-                              <span className="text-xs text-warm-red truncate max-w-[200px] shrink-0">{result.error.substring(0, 60)}</span>
+                              <span className="text-xs text-warm-red truncate max-w-[200px] shrink-0">{(result.error ?? "").substring(0, 60)}</span>
                             )}
                             {(result.status === "failed" || result.status === "error") && (
                               <Button

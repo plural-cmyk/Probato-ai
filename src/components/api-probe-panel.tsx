@@ -145,7 +145,7 @@ function FindingCard({ finding, category }: {
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="rounded-md bg-zinc-50 dark:bg-zinc-800 p-2">
               <span className="font-medium text-gray-500">Endpoint:</span>
-              <code className="block mt-0.5 text-gray-700 dark:text-gray-300 break-all">{finding.endpoint.substring(0, 150)}</code>
+              <code className="block mt-0.5 text-gray-700 dark:text-gray-300 break-all">{(finding.endpoint ?? "").substring(0, 150)}</code>
             </div>
             <div className="rounded-md bg-zinc-50 dark:bg-zinc-800 p-2">
               <span className="font-medium text-gray-500">Method:</span>
@@ -156,7 +156,7 @@ function FindingCard({ finding, category }: {
           {finding.evidence && (
             <div className="rounded-md bg-zinc-50 dark:bg-zinc-800 p-2">
               <span className="text-xs font-medium text-gray-500">Evidence:</span>
-              <code className="block text-xs mt-0.5 text-gray-700 dark:text-gray-300 break-all">{finding.evidence.substring(0, 300)}</code>
+              <code className="block text-xs mt-0.5 text-gray-700 dark:text-gray-300 break-all">{(finding.evidence ?? "").substring(0, 300)}</code>
             </div>
           )}
 

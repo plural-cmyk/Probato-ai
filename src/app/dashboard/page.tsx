@@ -122,13 +122,13 @@ import MarketplacePanel from "@/components/marketplace-panel";
 
 interface Project {
   id: string;
-  name: string;
-  repoUrl: string;
-  repoName: string;
+  name: string | null;
+  repoUrl: string | null;
+  repoName: string | null;
   liveUrl: string | null;
-  source: string; // "repo" or "url"
+  source: string | null; // "repo" or "url"
   status: string;
-  branch: string;
+  branch: string | null;
   sandboxId: string | null;
   sandboxUrl: string | null;
   createdAt: string;
@@ -2009,10 +2009,8 @@ export default function DashboardPage() {
                     />
                     <AvatarFallback className="bg-deep-indigo text-white text-sm">
                       {session.user?.name
-                        ?.split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase() ?? "U"}
+                        ? session.user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+                        : "U"}
                     </AvatarFallback>
                   </Avatar>
                   <span className="hidden text-sm font-medium md:inline">
@@ -2059,7 +2057,7 @@ export default function DashboardPage() {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-deep-indigo">
-            Welcome back, {session.user?.name?.split(" ")[0]}
+            Welcome back, {session.user?.name ? session.user.name.split(" ")[0] : "there"}
           </h1>
           <p className="mt-1 text-muted-foreground">
             Connect a repository to start generating automated tests.
@@ -2892,7 +2890,7 @@ export default function DashboardPage() {
                             View generated test code
                           </summary>
                           <pre className="mt-2 rounded-lg bg-zinc-950 text-zinc-100 p-3 text-xs font-mono overflow-x-auto max-h-60">
-                            {generatedResult.code.substring(0, 2000)}
+                            {(generatedResult.code ?? "").substring(0, 2000)}
                           </pre>
                         </details>
                       )}
@@ -3319,7 +3317,7 @@ export default function DashboardPage() {
                           <Github className="h-4 w-4 text-muted-foreground" />
                         )}
                         <CardTitle className="text-base">
-                          {project.name || project.repoName}
+                          {project.name || project.repoName || "Untitled Project"}
                         </CardTitle>
                       </div>
                       <Badge
@@ -3409,7 +3407,7 @@ export default function DashboardPage() {
                         size="sm"
                         variant="outline"
                         className="text-electric-violet"
-                        onClick={() => setShareDialogProject({ id: project.id, name: project.repoName })}
+                        onClick={() => setShareDialogProject({ id: project.id, name: project.repoName ?? project.name ?? "Untitled" })}
                         title="Share project"
                       >
                         <Share2 className="h-3.5 w-3.5" />
@@ -4057,7 +4055,7 @@ export default function DashboardPage() {
           <div className="relative w-full max-w-lg bg-white shadow-xl overflow-y-auto">
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
               <h3 className="font-semibold text-deep-indigo">
-                Sandbox: {selectedProject.repoName}
+                Sandbox: {selectedProject.repoName ?? selectedProject.name ?? "Project"}
               </h3>
               <Button
                 variant="ghost"
@@ -4089,7 +4087,7 @@ export default function DashboardPage() {
                     <CardDescription>Container</CardDescription>
                   </CardHeader>
                   <CardContent className="text-xs font-mono space-y-1">
-                    <div>ID: {sandboxStatus.sandbox.containerId.slice(0, 12)}</div>
+                    <div>ID: {(sandboxStatus.sandbox.containerId ?? "").slice(0, 12)}</div>
                     <div>Name: {sandboxStatus.sandbox.name}</div>
                     <div>Port: {sandboxStatus.sandbox.port ?? "N/A"}</div>
                     <div>

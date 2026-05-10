@@ -487,7 +487,7 @@ export default function PluginManagementPanel({ onClose }: PluginManagementPanel
                       {plugin.lastError && (
                         <div className="flex items-center gap-1 mt-1 text-[11px] text-red-500">
                           <AlertTriangle className="h-3 w-3" />
-                          {plugin.lastError.substring(0, 100)}
+                          {(plugin.lastError ?? "").substring(0, 100)}
                         </div>
                       )}
                     </div>

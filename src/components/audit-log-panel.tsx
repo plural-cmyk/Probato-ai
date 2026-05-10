@@ -321,7 +321,7 @@ export default function AuditLogPanel({ onClose }: Props) {
                     <div className="grid grid-cols-2 gap-2 pt-2">
                       {log.resourceId && <p><span className="text-muted-foreground">Resource ID:</span> {log.resourceId}</p>}
                       {log.ipAddress && <p><span className="text-muted-foreground">IP:</span> {log.ipAddress}</p>}
-                      <p><span className="text-muted-foreground">Hash:</span> <span className="font-mono text-xs">{log.entryHash.slice(0, 16)}...</span></p>
+                      <p><span className="text-muted-foreground">Hash:</span> <span className="font-mono text-xs">{(log.entryHash ?? "").slice(0, 16)}...</span></p>
                       <p><span className="text-muted-foreground">Previous:</span> <span className="font-mono text-xs">{(log.previousHash || "genesis").slice(0, 16)}...</span></p>
                     </div>
                     {log.beforeSnapshot && (

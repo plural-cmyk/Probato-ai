@@ -707,7 +707,7 @@ export default function IntegrationPanel({ onClose }: IntegrationPanelProps) {
                                   />
                                   {i % 2 === 0 && (
                                     <span className="text-[8px] text-muted-foreground mt-0.5">
-                                      {entry.date.slice(5)}
+                                      {(entry.date ?? "").slice(5)}
                                     </span>
                                   )}
                                 </div>

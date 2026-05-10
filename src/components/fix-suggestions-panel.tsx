@@ -213,7 +213,7 @@ function CodeBlock({ label, code }: { label: string; code: string }) {
         {label}
       </div>
       <pre className="px-3 py-2 text-xs font-mono overflow-x-auto max-h-40 bg-zinc-950 text-zinc-100">
-        {code.substring(0, 3000)}
+        {(code ?? "").substring(0, 3000)}
         {code.length > 3000 ? "\n... (truncated)" : ""}
       </pre>
     </div>
@@ -275,7 +275,7 @@ function SuggestionCard({
             </div>
             {suggestion.errorMessage && (
               <p className="text-xs text-red-500 mt-1 truncate">
-                Error: {suggestion.errorMessage.substring(0, 100)}
+                Error: {(suggestion.errorMessage ?? "").substring(0, 100)}
               </p>
             )}
           </div>

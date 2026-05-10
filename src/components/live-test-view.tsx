@@ -580,7 +580,7 @@ export default function LiveTestView({ onRunTest, isRunning, onCancel, onComplet
                                   : "text-gray-500"
                               }`}
                             >
-                              {req.method} {req.status} {req.url.length > 60 ? req.url.substring(0, 60) + "..." : req.url}
+                              {req.method} {req.status} {(req.url ?? "").length > 60 ? (req.url ?? "").substring(0, 60) + "..." : req.url}
                             </div>
                           ))}
                         </div>
@@ -714,7 +714,7 @@ export default function LiveTestView({ onRunTest, isRunning, onCancel, onComplet
                     .map((e, i) => (
                       <div key={i} className="text-xs font-mono text-red-600 bg-red-50 dark:bg-red-950/20 rounded px-2 py-1">
                         <span className="text-gray-400">[{e.method} {e.status}]</span>{" "}
-                        {e.url.length > 80 ? e.url.substring(0, 80) + "..." : e.url}
+                        {(e.url ?? "").length > 80 ? (e.url ?? "").substring(0, 80) + "..." : e.url}
                       </div>
                     ))}
                 </div>
