@@ -955,11 +955,11 @@ export default function DashboardPage() {
           testCases,
         });
       } else {
-        console.error("[Generate] API error:", data.error || data.details);
+        console.error("[Generate] API error:", data.error, data.details);
         setGeneratedResult({ 
           featureCount: 0, 
           savedCount: 0, 
-          error: data.error || data.details || "Test generation failed" 
+          error: `${data.error || "Test generation failed"}${data.details ? `: ${data.details}` : ""}` 
         });
       }
     } catch (err) {

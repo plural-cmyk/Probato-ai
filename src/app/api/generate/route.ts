@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { generatePlaywrightTest, generateTestSuite, generateCombinedTestFile } from "@/lib/agent/test-generator";
-import { sel, actions } from "@/lib/agent/actions";
+import { sel, actions as actionHelpers } from "@/lib/agent/actions";
 import { checkCredits, deductCredits } from "@/lib/billing/credits";
 
 export const dynamic = "force-dynamic";
@@ -141,20 +141,35 @@ export async function POST(request: NextRequest) {
 
       // Build feature data for test generation
       const featureData = features.map((f) => ({
-        name: f.name,
-        type: f.type,
+        name: f.name || "Unnamed feature",
+        type: f.type || "unknown",
         description: f.description ?? undefined,
         selector: f.selector ?? undefined,
         suggestedActions: buildActionsFromFeatureData(f, targetUrl),
       }));
 
-      if (format === "combined") {
-        // Generate a single combined test file
-        const combinedCode = generateCombinedTestFile(
+      // Try to generate combined test code — wrap in try-catch so individual test saving can still succeed
+      let combinedCode = "";
+      try {
+        combinedCode = generateCombinedTestFile(
           "Probato Project",
           targetUrl,
           featureData
         );
+      } catch (genErr) {
+        console.error("[Generate] Combined code generation failed:", genErr);
+      }
+
+      if (format === "combined") {
+        // Generate a single combined test file
+        if (!combinedCode) {
+          try {
+            combinedCode = generateCombinedTestFile("Probato Project", targetUrl, featureData);
+          } catch (e) {
+            console.error("[Generate] Combined format generation failed:", e);
+            return NextResponse.json({ error: "Test generation failed", details: e instanceof Error ? e.message : String(e) }, { status: 500 });
+          }
+        }
 
         return NextResponse.json({
           generated: true,
@@ -166,7 +181,13 @@ export async function POST(request: NextRequest) {
       }
 
       // Generate individual test cases
-      const suite = generateTestSuite("Project", targetUrl, featureData);
+      let suite;
+      try {
+        suite = generateTestSuite("Project", targetUrl, featureData);
+      } catch (suiteErr) {
+        console.error("[Generate] Test suite generation failed:", suiteErr);
+        return NextResponse.json({ error: "Test generation failed", details: suiteErr instanceof Error ? suiteErr.message : String(suiteErr) }, { status: 500 });
+      }
 
       // Save each test case to DB
       let savedCount = 0;
@@ -199,12 +220,15 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Generate a combined code preview for the frontend
-      const combinedCode = generateCombinedTestFile(
-        "Probato Project",
-        targetUrl,
-        featureData
-      );
+      // Use the combined code we already generated (or try again if it failed the first time)
+      if (!combinedCode) {
+        try {
+          combinedCode = generateCombinedTestFile("Probato Project", targetUrl, featureData);
+        } catch (e2) {
+          console.error("[Generate] Second attempt at combined code failed:", e2);
+          combinedCode = suite.testCases.map((tc) => tc.code).join("\n\n");
+        }
+      }
 
       return NextResponse.json({
         generated: true,
@@ -232,7 +256,8 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("[Generate] Failed:", message);
+    const stack = error instanceof Error ? error.stack : "";
+    console.error("[Generate] Failed:", message, stack);
     return NextResponse.json({ error: "Test generation failed", details: message }, { status: 500 });
   }
 }
@@ -246,32 +271,32 @@ function buildActionsFromFeatureData(
   switch (feature.type) {
     case "form":
       return [
-        actions.navigate(url, `Navigate to form`),
-        actions.waitForSelector(sel.css(feature.selector ?? "form"), 5000, "Wait for form"),
-        actions.screenshot(false, "Form loaded"),
-        actions.assertVisible(sel.css(feature.selector ?? "form"), "Verify form is visible"),
+        actionHelpers.navigate(url, `Navigate to form`),
+        actionHelpers.waitForSelector(sel.css(feature.selector ?? "form"), 5000, "Wait for form"),
+        actionHelpers.screenshot(false, "Form loaded"),
+        actionHelpers.assertVisible(sel.css(feature.selector ?? "form"), "Verify form is visible"),
       ];
     case "navigation":
       return [
-        actions.navigate(url, `Navigate to page`),
-        actions.waitForSelector(sel.css("nav, [role=navigation]"), 5000, "Wait for navigation"),
-        actions.assertVisible(sel.css("nav, [role=navigation]"), "Verify navigation is visible"),
-        actions.screenshot(false, "Navigation check"),
+        actionHelpers.navigate(url, `Navigate to page`),
+        actionHelpers.waitForSelector(sel.css("nav, [role=navigation]"), 5000, "Wait for navigation"),
+        actionHelpers.assertVisible(sel.css("nav, [role=navigation]"), "Verify navigation is visible"),
+        actionHelpers.screenshot(false, "Navigation check"),
       ];
     case "page":
       return [
-        actions.navigate(feature.route ?? url, `Navigate to ${feature.name}`),
-        actions.waitForSelector(sel.css("body"), 5000, "Wait for page"),
-        actions.screenshot(false, "Page loaded"),
+        actionHelpers.navigate(feature.route ?? url, `Navigate to ${feature.name}`),
+        actionHelpers.waitForSelector(sel.css("body"), 5000, "Wait for page"),
+        actionHelpers.screenshot(false, "Page loaded"),
       ];
     default:
       return [
-        actions.navigate(url, `Navigate to page`),
-        actions.waitForSelector(sel.css("body"), 5000, "Wait for page"),
+        actionHelpers.navigate(url, `Navigate to page`),
+        actionHelpers.waitForSelector(sel.css("body"), 5000, "Wait for page"),
         ...(feature.selector
-          ? [actions.assertVisible(sel.css(feature.selector), `Verify ${feature.name} is visible`)]
+          ? [actionHelpers.assertVisible(sel.css(feature.selector), `Verify ${feature.name} is visible`)]
           : []),
-        actions.screenshot(false, "Basic check"),
+        actionHelpers.screenshot(false, "Basic check"),
       ];
   }
 }

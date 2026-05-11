@@ -443,6 +443,7 @@ function generateReadText(action: ReadTextAction, pageVar: string): string[] {
  * Playwright supports CSS, XPath, text, and role-based selectors.
  */
 function selectorToPlaywright(selector: Selector): string {
+  if (!selector || !selector.value) return "body";
   switch (selector.strategy) {
     case "css":
       return selector.value;
@@ -533,6 +534,7 @@ function buildTestFile(opts: {
 // ── Helpers ──────────────────────────────────────────────────────
 
 function sanitizeForFilename(name: string): string {
+  if (!name || typeof name !== "string") return "unnamed";
   return name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -541,5 +543,6 @@ function sanitizeForFilename(name: string): string {
 }
 
 function escapeString(str: string): string {
+  if (!str || typeof str !== "string") return "";
   return str.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '\\"');
 }
