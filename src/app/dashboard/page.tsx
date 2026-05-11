@@ -66,6 +66,7 @@ import {
   Box,
   Store,
   GitMerge,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -343,6 +344,21 @@ export default function DashboardPage() {
     maxDepth: number;
     cycleCount: number;
   } | null>(null);
+
+  // Run generated tests state
+  const [runningGeneratedTests, setRunningGeneratedTests] = useState(false);
+  const [generatedTestResult, setGeneratedTestResult] = useState<{
+    testRunId: string;
+    status: string;
+    totalSteps: number;
+    passedSteps: number;
+    failedSteps: number;
+    duration: number;
+    error?: string;
+  } | null>(null);
+
+  // CSV download state
+  const [csvDownloading, setCsvDownloading] = useState(false);
 
   // CI/CD Integration state
   const [ciData, setCiData] = useState<{
@@ -1051,6 +1067,135 @@ export default function DashboardPage() {
     } catch (err) {
       setTestOrder(null);
       console.error("[Test Order] Request failed:", err);
+    }
+  }
+
+  async function runGeneratedTests() {
+    if (!discoverProjectId.trim()) return;
+    setRunningGeneratedTests(true);
+    setGeneratedTestResult(null);
+    try {
+      const effectiveUrl = discoverUrl.trim() || projects.find(p => p.id === discoverProjectId)?.liveUrl || "";
+      if (!effectiveUrl) {
+        setGeneratedTestResult({
+          testRunId: "",
+          status: "error",
+          totalSteps: 0,
+          passedSteps: 0,
+          failedSteps: 0,
+          duration: 0,
+          error: "No URL available. Set a discovery URL first.",
+        });
+        setRunningGeneratedTests(false);
+        return;
+      }
+
+      // Build actions from generated test cases
+      let testActions: { type: string; label: string; url?: string; selector?: { strategy: string; value: string } }[] = [];
+      if (generatedResult?.testCases && generatedResult.testCases.length > 0) {
+        // Run a smoke test for each generated test case's target
+        for (const tc of generatedResult.testCases) {
+          testActions.push({
+            type: "navigate",
+            label: `Navigate to ${tc.featureName || tc.name}`,
+            url: effectiveUrl,
+          });
+          testActions.push({
+            type: "waitForSelector",
+            label: `Wait for ${tc.featureName || tc.name}`,
+            selector: { strategy: "css", value: "body" },
+          });
+          testActions.push({
+            type: "screenshot",
+            label: `Screenshot: ${tc.featureName || tc.name}`,
+          });
+        }
+      } else {
+        // Fallback: smoke test
+        testActions = [
+          { type: "navigate", label: "Navigate to target", url: effectiveUrl },
+          { type: "waitForSelector", label: "Wait for page", selector: { strategy: "css", value: "body" } },
+          { type: "screenshot", label: "Page loaded" },
+        ];
+      }
+
+      const res = await fetch("/api/test/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: effectiveUrl,
+          projectId: discoverProjectId.trim(),
+          actions: testActions,
+          screenshotEveryStep: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const result = data.result;
+        setGeneratedTestResult({
+          testRunId: data.testRunId ?? "",
+          status: result?.status ?? "unknown",
+          totalSteps: result?.summary?.total ?? 0,
+          passedSteps: result?.summary?.passed ?? 0,
+          failedSteps: result?.summary?.failed ?? 0,
+          duration: result?.duration ?? 0,
+        });
+        // Also update the testResult state so it shows in the Test Runner section
+        setTestResult(data);
+      } else {
+        setGeneratedTestResult({
+          testRunId: data.testRunId ?? "",
+          status: "error",
+          totalSteps: 0,
+          passedSteps: 0,
+          failedSteps: 0,
+          duration: 0,
+          error: data.error || data.details || "Test run failed",
+        });
+      }
+    } catch (err) {
+      console.error("[Run Generated] Failed:", err);
+      setGeneratedTestResult({
+        testRunId: "",
+        status: "error",
+        totalSteps: 0,
+        passedSteps: 0,
+        failedSteps: 0,
+        duration: 0,
+        error: "Network error — the request may have timed out.",
+      });
+    } finally {
+      setRunningGeneratedTests(false);
+    }
+  }
+
+  async function downloadCSV() {
+    if (!discoverProjectId.trim()) return;
+    setCsvDownloading(true);
+    try {
+      const res = await fetch(`/api/reports?projectId=${discoverProjectId.trim()}&format=csv`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        // Extract filename from Content-Disposition header or use default
+        const disposition = res.headers.get("Content-Disposition");
+        const filenameMatch = disposition?.match(/filename="?([^"]+)"?/);
+        a.download = filenameMatch?.[1] ?? "project-report.csv";
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        const data = await res.json().catch(() => ({ error: "Download failed" }));
+        alert(data.error || "Failed to download CSV report");
+      }
+    } catch (err) {
+      console.error("[CSV Download] Failed:", err);
+      alert("Failed to download CSV. Please try again.");
+    } finally {
+      setCsvDownloading(false);
     }
   }
 
@@ -2872,6 +3017,20 @@ export default function DashboardPage() {
                                   size="sm"
                                   variant="outline"
                                   className="text-xs h-7"
+                                  onClick={runGeneratedTests}
+                                  disabled={runningGeneratedTests || !generatedResult || generatedResult.featureCount === 0}
+                                >
+                                  {runningGeneratedTests ? (
+                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Play className="mr-1 h-3 w-3" />
+                                  )}
+                                  Run Tests
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7"
                                   onClick={runAutoHeal}
                                   disabled={autoHealing}
                                 >
@@ -2890,6 +3049,20 @@ export default function DashboardPage() {
                                 >
                                   <ListChecks className="mr-1 h-3 w-3" />
                                   Test Order
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7"
+                                  onClick={downloadCSV}
+                                  disabled={csvDownloading}
+                                >
+                                  {csvDownloading ? (
+                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Download className="mr-1 h-3 w-3" />
+                                  )}
+                                  Download CSV
                                 </Button>
                               </div>
                             )}
@@ -2991,6 +3164,35 @@ export default function DashboardPage() {
                               </pre>
                             </details>
                           )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Test Run Result */}
+                  {generatedTestResult && (
+                    <div className={`rounded-lg border p-4 ${generatedTestResult.status === "passed" ? "bg-emerald/5 border-emerald/30" : generatedTestResult.error ? "bg-warm-red/5 border-warm-red/30" : "bg-white"}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Play className={`h-4 w-4 ${generatedTestResult.status === "passed" ? "text-emerald" : generatedTestResult.error ? "text-warm-red" : "text-amber"}`} />
+                        <h4 className="text-sm font-semibold text-deep-indigo">Test Run Result</h4>
+                      </div>
+                      {generatedTestResult.error ? (
+                        <p className="text-xs text-warm-red">{generatedTestResult.error}</p>
+                      ) : (
+                        <>
+                          <div className="flex gap-3 mb-2">
+                            <Badge variant="secondary" className={`text-xs ${generatedTestResult.status === "passed" ? "text-emerald" : "text-warm-red"}`}>
+                              {generatedTestResult.status === "passed" ? "Passed" : generatedTestResult.status === "failed" ? "Failed" : generatedTestResult.status}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs text-emerald">{generatedTestResult.passedSteps} passed</Badge>
+                            {generatedTestResult.failedSteps > 0 && (
+                              <Badge variant="secondary" className="text-xs text-warm-red">{generatedTestResult.failedSteps} failed</Badge>
+                            )}
+                            <Badge variant="secondary" className="text-xs text-muted-foreground">{(generatedTestResult.duration / 1000).toFixed(1)}s</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {generatedTestResult.totalSteps} total steps • Run ID: {generatedTestResult.testRunId.substring(0, 8)}...
+                          </p>
                         </>
                       )}
                     </div>
