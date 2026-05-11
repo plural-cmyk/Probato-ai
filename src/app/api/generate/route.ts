@@ -52,8 +52,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Feature not found" }, { status: 404 });
       }
 
-      // Use the feature's route or the provided URL
-      const targetUrl = url ?? feature.route ?? "";
+      // Use the feature's route or the provided URL, or project's liveUrl
+      let targetUrl = url ?? feature.route ?? "";
+      if (!targetUrl) {
+        const project = await db.project.findUnique({ where: { id: feature.projectId } });
+        if (project?.liveUrl) {
+          targetUrl = project.liveUrl;
+        } else if (project?.sandboxUrl) {
+          targetUrl = project.sandboxUrl;
+        }
+      }
       if (!targetUrl) {
         return NextResponse.json({ error: "No URL available for this feature" }, { status: 400 });
       }
@@ -112,9 +120,23 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "No features found for this project. Run discovery first." }, { status: 400 });
       }
 
-      const targetUrl = url ?? features[0]?.route ?? "";
+      // Resolve target URL: explicit > feature route > project liveUrl > project repoUrl
+      let targetUrl = url ?? "";
       if (!targetUrl) {
-        return NextResponse.json({ error: "No URL available. Provide a URL or ensure features have routes." }, { status: 400 });
+        targetUrl = features[0]?.route ?? "";
+      }
+      if (!targetUrl) {
+        const project = await db.project.findUnique({ where: { id: projectId } });
+        if (project?.liveUrl) {
+          targetUrl = project.liveUrl;
+        } else if (project?.sandboxUrl) {
+          targetUrl = project.sandboxUrl;
+        } else if (project?.repoUrl && project.repoUrl.startsWith("http")) {
+          targetUrl = project.repoUrl;
+        }
+      }
+      if (!targetUrl) {
+        return NextResponse.json({ error: "No URL available. Provide a URL in the dashboard or ensure the project has a live URL." }, { status: 400 });
       }
 
       // Build feature data for test generation

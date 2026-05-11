@@ -65,7 +65,7 @@ export async function buildDependencyGraph(projectId: string): Promise<Dependenc
 
   // Create nodes
   for (const feature of features) {
-    const deps = feature.dependencies as string[];
+    const deps = Array.isArray(feature.dependencies) ? feature.dependencies : [];
     nodes.set(feature.id, {
       id: feature.id,
       name: feature.name,
@@ -117,7 +117,7 @@ export async function buildDependencyGraphByName(projectId: string): Promise<Dep
 
   // Create nodes
   for (const feature of features) {
-    const deps = feature.dependencies as string[];
+    const deps = Array.isArray(feature.dependencies) ? feature.dependencies : [];
     nodes.set(feature.id, {
       id: feature.id,
       name: feature.name,

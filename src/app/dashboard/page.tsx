@@ -326,6 +326,7 @@ export default function DashboardPage() {
     featureCount: number;
     savedCount: number;
     code?: string;
+    error?: string;
   } | null>(null);
   const [autoHealing, setAutoHealing] = useState(false);
   const [autoHealResult, setAutoHealResult] = useState<{
@@ -924,26 +925,41 @@ export default function DashboardPage() {
     setGeneratingTests(true);
     setGeneratedResult(null);
     try {
+      // Use discoverUrl or fallback to the project's liveUrl
+      const effectiveUrl = discoverUrl.trim() || projects.find(p => p.id === discoverProjectId)?.liveUrl || "";
+      
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId: discoverProjectId.trim(),
-          url: discoverUrl,
+          url: effectiveUrl,
         }),
       });
       const data = await res.json();
       if (res.ok) {
+        // Extract code from different response formats
+        let code = data.suite?.testCases?.[0]?.code ?? data.code ?? data.testCase?.code ?? "";
         setGeneratedResult({
-          featureCount: data.featureCount,
-          savedCount: data.savedCount,
-          code: data.suite?.testCases?.[0]?.code,
+          featureCount: data.featureCount ?? 0,
+          savedCount: data.savedCount ?? 0,
+          code,
         });
       } else {
-        setGeneratedResult({ featureCount: 0, savedCount: 0 });
+        console.error("[Generate] API error:", data.error || data.details);
+        setGeneratedResult({ 
+          featureCount: 0, 
+          savedCount: 0, 
+          error: data.error || data.details || "Test generation failed" 
+        });
       }
-    } catch {
-      setGeneratedResult({ featureCount: 0, savedCount: 0 });
+    } catch (err) {
+      console.error("[Generate] Request failed:", err);
+      setGeneratedResult({ 
+        featureCount: 0, 
+        savedCount: 0, 
+        error: "Network error — the request may have timed out." 
+      });
     } finally {
       setGeneratingTests(false);
     }
@@ -2921,25 +2937,34 @@ export default function DashboardPage() {
 
                   {/* Generated Tests Result */}
                   {generatedResult && (
-                    <div className="rounded-lg border p-4 bg-white">
+                    <div className={`rounded-lg border p-4 ${generatedResult.error ? "bg-warm-red/5 border-warm-red/30" : "bg-white"}`}>
                       <div className="flex items-center gap-2 mb-2">
-                        <Sparkles className="h-4 w-4 text-amber" />
+                        <Sparkles className={`h-4 w-4 ${generatedResult.error ? "text-warm-red" : "text-amber"}`} />
                         <h4 className="text-sm font-semibold text-deep-indigo">Generated Playwright Tests</h4>
                       </div>
-                      <div className="flex gap-3 mb-2">
-                        <Badge variant="secondary" className="text-xs">{generatedResult.featureCount} features</Badge>
-                        <Badge variant="secondary" className="text-xs text-emerald">{generatedResult.savedCount} saved to DB</Badge>
-                      </div>
-                      {generatedResult.code && (
-                        <details className="group">
-                          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-deep-indigo flex items-center gap-1">
-                            <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform" />
-                            View generated test code
-                          </summary>
-                          <pre className="mt-2 rounded-lg bg-zinc-950 text-zinc-100 p-3 text-xs font-mono overflow-x-auto max-h-60">
-                            {(generatedResult.code ?? "").substring(0, 2000)}
-                          </pre>
-                        </details>
+                      {generatedResult.error ? (
+                        <div>
+                          <Badge variant="secondary" className="text-xs text-warm-red">Generation failed</Badge>
+                          <p className="text-xs text-warm-red mt-2">{generatedResult.error}</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex gap-3 mb-2">
+                            <Badge variant="secondary" className="text-xs">{generatedResult.featureCount} features</Badge>
+                            <Badge variant="secondary" className="text-xs text-emerald">{generatedResult.savedCount} saved to DB</Badge>
+                          </div>
+                          {generatedResult.code && (
+                            <details className="group">
+                              <summary className="cursor-pointer text-xs text-muted-foreground hover:text-deep-indigo flex items-center gap-1">
+                                <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform" />
+                                View generated test code
+                              </summary>
+                              <pre className="mt-2 rounded-lg bg-zinc-950 text-zinc-100 p-3 text-xs font-mono overflow-x-auto max-h-60">
+                                {(generatedResult.code ?? "").substring(0, 2000)}
+                              </pre>
+                            </details>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

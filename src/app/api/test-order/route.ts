@@ -54,7 +54,33 @@ export async function GET(request: NextRequest) {
     }
 
     // Build dependency graph and compute execution order
-    const { graph, ...order } = await getProjectExecutionOrder(projectId);
+    let graph, order;
+    try {
+      const result = await getProjectExecutionOrder(projectId);
+      graph = result.graph;
+      order = result;
+    } catch (graphError) {
+      const msg = graphError instanceof Error ? graphError.message : String(graphError);
+      console.error("[Test Order] Dependency graph build failed:", msg);
+      // Fallback: return features in simple order without dependency resolution
+      const features = await db.feature.findMany({
+        where: { projectId },
+        orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
+      });
+      return NextResponse.json({
+        projectId,
+        executionOrder: {
+          levels: [features.map((f) => ({ id: f.id, name: f.name, type: f.type, priority: f.priority }))],
+          totalFeatures: features.length,
+          maxDepth: 1,
+          parallelGroups: [features.map((f) => f.id)],
+          cycleCount: 0,
+        },
+        cycles: [],
+        cycleCount: 0,
+        warning: `Dependency graph could not be built (${msg}). Showing features in priority order.`,
+      });
+    }
 
     // Build node details for the response
     const nodeDetails = new Map<string, { name: string; type: string; priority: number }>();
