@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
       if (format === "combined") {
         // Generate a single combined test file
         const combinedCode = generateCombinedTestFile(
-          features[0].project ? "Probato Project" : "Project",
+          "Probato Project",
           targetUrl,
           featureData
         );
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
 
       // Generate a combined code preview for the frontend
       const combinedCode = generateCombinedTestFile(
-        features[0].project ? "Probato Project" : "Project",
+        "Probato Project",
         targetUrl,
         featureData
       );
