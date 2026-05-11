@@ -36,16 +36,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Test run not found" }, { status: 404 });
     }
 
-    // Only heal failed test runs
-    if (testRun.status !== "failed" && testRun.status !== "error") {
+    // Only heal test runs that have failed results
+    // Allow any status as long as there are failed/error results to heal
+    const failedResults = testRun.results.filter((r) => r.status === "failed" || r.status === "error");
+
+    if (failedResults.length === 0) {
+      if (testRun.status !== "failed" && testRun.status !== "error") {
+        return NextResponse.json(
+          { error: `Test run status is "${testRun.status}" with no failed results. Only runs with failed steps can be auto-healed.` },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        { error: `Test run status is "${testRun.status}", not "failed". Only failed runs can be auto-healed.` },
+        { error: "No failed steps found in this test run." },
         { status: 400 }
       );
     }
 
     // Build failed steps from test results
-    const failedResults = testRun.results.filter((r) => r.status === "failed" || r.status === "error");
     const failedSteps = failedResults.map((result) => ({
       action: {
         type: "click" as const,
@@ -60,15 +68,25 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     }));
 
-    if (failedSteps.length === 0) {
-      return NextResponse.json({ error: "No failed steps to heal" }, { status: 400 });
-    }
-
-    // Determine the target URL
-    const targetUrl = url ?? "";
+    // Determine the target URL — try from request body, then from project
+    let targetUrl = url ?? "";
 
     if (!targetUrl) {
-      return NextResponse.json({ error: "URL is required for auto-heal. Provide the target page URL." }, { status: 400 });
+      // Try to get URL from the project associated with the test run
+      const project = await db.project.findUnique({
+        where: { id: testRun.projectId },
+      });
+      if (project?.liveUrl) {
+        targetUrl = project.liveUrl;
+      } else if (project?.sandboxUrl) {
+        targetUrl = project.sandboxUrl;
+      } else if (project?.repoUrl && project.repoUrl.startsWith("http")) {
+        targetUrl = project.repoUrl;
+      }
+    }
+
+    if (!targetUrl) {
+      return NextResponse.json({ error: "URL is required for auto-heal. Provide the target page URL or ensure the project has a live URL." }, { status: 400 });
     }
 
     // ── Plan feature check (auto-heal requires Pro+) ──

@@ -1011,12 +1011,21 @@ export default function DashboardPage() {
     if (!discoverProjectId.trim()) return;
     try {
       const res = await fetch(`/api/test-order?projectId=${discoverProjectId.trim()}&impact=true`);
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
-        setTestOrder(data.executionOrder ?? null);
+        // Merge cycleCount from top-level into executionOrder if not already present
+        const execOrder = data.executionOrder ?? null;
+        if (execOrder && execOrder.cycleCount === undefined && data.cycleCount !== undefined) {
+          execOrder.cycleCount = data.cycleCount;
+        }
+        setTestOrder(execOrder);
+      } else {
+        setTestOrder(null);
+        console.error("[Test Order] Failed:", data.error || data.details || "Unknown error");
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      setTestOrder(null);
+      console.error("[Test Order] Request failed:", err);
     }
   }
 

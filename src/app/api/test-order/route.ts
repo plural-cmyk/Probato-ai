@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { db } from "@/lib/db";
 import {
   getProjectExecutionOrder,
   getProjectImpactAnalysis,
@@ -26,6 +27,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "projectId is required" }, { status: 400 });
     }
 
+    // Verify the project exists and belongs to the user
+    const project = await db.project.findFirst({
+      where: { id: projectId, userId: session.user.id },
+    });
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // Check if project has features
+    const featureCount = await db.feature.count({ where: { projectId } });
+    if (featureCount === 0) {
+      return NextResponse.json({
+        projectId,
+        executionOrder: {
+          levels: [],
+          totalFeatures: 0,
+          maxDepth: 0,
+          parallelGroups: [],
+        },
+        cycles: [],
+        cycleCount: 0,
+        impactAnalysis: [],
+        message: "No features found for this project. Run discovery first.",
+      });
+    }
+
     // Build dependency graph and compute execution order
     const { graph, ...order } = await getProjectExecutionOrder(projectId);
 
@@ -39,13 +66,14 @@ export async function GET(request: NextRequest) {
       projectId,
       executionOrder: {
         levels: order.levels.map((level) =>
-          level.map((id) => ({ id, ...nodeDetails.get(id) }))
+          level.map((id) => ({ id, ...(nodeDetails.get(id) ?? { name: "Unknown", type: "unknown", priority: 0 }) }))
         ),
         totalFeatures: order.totalFeatures,
         maxDepth: order.maxDepth,
         parallelGroups: order.parallelGroups.map((group) =>
-          group.map((id) => ({ id, ...nodeDetails.get(id) }))
+          group.map((id) => ({ id, ...(nodeDetails.get(id) ?? { name: "Unknown", type: "unknown", priority: 0 }) }))
         ),
+        cycleCount: graph.cycles.length,
       },
       cycles: graph.cycles,
       cycleCount: graph.cycles.length,
@@ -53,14 +81,19 @@ export async function GET(request: NextRequest) {
 
     // Include impact analysis if requested
     if (includeImpact) {
-      const impact = await getProjectImpactAnalysis(projectId);
-      response.impactAnalysis = impact;
+      try {
+        const impact = await getProjectImpactAnalysis(projectId);
+        response.impactAnalysis = impact;
+      } catch (impactError) {
+        console.warn("[Test Order] Impact analysis failed, skipping:", impactError);
+        response.impactAnalysis = [];
+      }
     }
 
     return NextResponse.json(response);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("[Test Order] Failed:", message);
+    console.error("[Test Order] Failed:", message, error instanceof Error ? error.stack : "");
     return NextResponse.json({ error: "Failed to compute test order", details: message }, { status: 500 });
   }
 }

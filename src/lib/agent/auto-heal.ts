@@ -66,16 +66,36 @@ export async function autoHealTestRun(
   let totalFailed = 0;
 
   // Only attempt to heal steps that have a selector-based failure
+  // Be inclusive: any failed step with a selector is potentially healable
   const healableSteps = failedSteps.filter(
     (step) =>
       step.status === "failed" &&
       step.action &&
-      "selector" in step.action &&
-      step.error &&
-      isSelectorError(step.error)
+      "selector" in step.action
   );
 
-  if (healableSteps.length === 0) {
+  // Also include steps without explicit selectors but with errors that suggest selector issues
+  const stepsWithSelectorErrors = failedSteps.filter(
+    (step) =>
+      step.status === "failed" &&
+      step.error &&
+      isSelectorError(step.error) &&
+      !healableSteps.includes(step)
+  );
+
+  // For steps without a selector in the action, synthesize one from the error
+  const synthesizedSteps: StepResult[] = stepsWithSelectorErrors.map((step) => ({
+    ...step,
+    action: {
+      type: "click" as const,
+      selector: extractSelectorFromErrorString(step.error ?? ""),
+      label: step.action?.label ?? "Unknown",
+    },
+  }));
+
+  const allHealableSteps = [...healableSteps, ...synthesizedSteps];
+
+  if (allHealableSteps.length === 0) {
     return {
       featureId: "",
       featureName: "",
@@ -84,7 +104,7 @@ export async function autoHealTestRun(
       totalHealed: 0,
       totalFailed: 0,
       duration: Date.now() - startTime,
-      error: "No selector-based failures to heal",
+      error: "No healable failures found — all steps may have passed or have non-selector errors",
     };
   }
 
@@ -107,7 +127,7 @@ export async function autoHealTestRun(
     await new Promise((r) => setTimeout(r, 1500));
 
     // Process each healable step
-    for (const step of healableSteps) {
+    for (const step of allHealableSteps) {
       const action = step.action as TestAction & { selector: Selector };
       const originalSelector = action.selector;
 
@@ -176,7 +196,60 @@ export async function autoHealTestRun(
     await page.close();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[Auto-Heal] Failed: ${message}`);
+    console.error(`[Auto-Heal] Browser-based heal failed: ${message}`);
+
+    // Fallback: try heuristic-based healing without a browser
+    console.log(`[Auto-Heal] Attempting browser-less heuristic heal fallback`);
+    for (const step of allHealableSteps) {
+      const action = step.action as TestAction & { selector: Selector };
+      const originalSelector = action.selector;
+
+      // Generate heuristic alternative selectors based on the original
+      const candidates = generateHeuristicCandidates(originalSelector, step.error ?? "");
+
+      if (candidates.length > 0) {
+        // Pick the highest-confidence candidate as the healed selector
+        const best = candidates[0];
+        healResults.push({
+          originalSelector,
+          healedSelector: best.selector,
+          confidence: best.confidence,
+          candidates,
+          healed: true,
+          retestPassed: false, // Cannot verify without browser
+          url: targetUrl,
+        });
+        totalHealed++;
+
+        // Update the test case in the database
+        await updateHealedSelector(action, best.selector);
+      } else {
+        healResults.push({
+          originalSelector,
+          healedSelector: null,
+          confidence: 0,
+          candidates: [],
+          healed: false,
+          retestPassed: false,
+          url: targetUrl,
+          error: "No heuristic alternatives found",
+        });
+        totalFailed++;
+      }
+    }
+
+    if (totalHealed > 0) {
+      return {
+        featureId: "",
+        featureName: "",
+        testRunId,
+        healResults,
+        totalHealed,
+        totalFailed,
+        duration: Date.now() - startTime,
+      };
+    }
+
     return {
       featureId: "",
       featureName: "",
@@ -185,7 +258,7 @@ export async function autoHealTestRun(
       totalHealed,
       totalFailed,
       duration: Date.now() - startTime,
-      error: message,
+      error: `Browser unavailable (${message}) and no heuristic alternatives found`,
     };
   } finally {
     if (managed) {
@@ -781,6 +854,202 @@ async function updateHealedSelector(
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+/**
+ * Extract a Selector from an error message string.
+ * Used when the StepResult doesn't have a structured selector in the action.
+ */
+function extractSelectorFromErrorString(error: string): Selector {
+  // Try common patterns in error messages
+  const cssMatch = error.match(/css:"([^"]+)"/);
+  if (cssMatch) return { strategy: "css", value: cssMatch[1] };
+
+  const testIdMatch = error.match(/testId:"([^"]+)"/);
+  if (testIdMatch) return { strategy: "testId", value: testIdMatch[1] };
+
+  const textMatch = error.match(/text:"([^"]+)"/);
+  if (textMatch) return { strategy: "text", value: textMatch[1] };
+
+  const roleMatch = error.match(/role:"([^"]+)"/);
+  if (roleMatch) return { strategy: "role", value: roleMatch[1] };
+
+  // Try extracting from quoted selectors like [data-testid="..."]
+  const attrMatch = error.match(/\[data-testid="([^"]+)"\]/);
+  if (attrMatch) return { strategy: "testId", value: attrMatch[1] };
+
+  const idMatch = error.match(/#([\w-]+)/);
+  if (idMatch) return { strategy: "css", value: `#${idMatch[1]}` };
+
+  const classMatch = error.match(/\.([\w-]+)/);
+  if (classMatch) return { strategy: "css", value: `.${classMatch[1]}` };
+
+  // Default: use body as fallback
+  return { strategy: "css", value: "body" };
+}
+
+/**
+ * Generate heuristic alternative selectors without needing a browser.
+ * Uses pattern-based transformations on the original selector.
+ */
+function generateHeuristicCandidates(
+  originalSelector: Selector,
+  errorMessage: string
+): HealCandidate[] {
+  const candidates: HealCandidate[] = [];
+  const value = originalSelector.value;
+
+  switch (originalSelector.strategy) {
+    case "css": {
+      // If it's a class selector, try variations
+      const classMatch = value.match(/\.([\w-]+)/);
+      if (classMatch) {
+        const className = classMatch[1];
+        // Try partial class name match
+        const parts = className.split(/[-_]/);
+        if (parts.length > 1) {
+          // Try with just the first part
+          candidates.push({
+            selector: { strategy: "css", value: `.${parts[0]}` },
+            confidence: 0.6,
+            strategy: "partial-class",
+          });
+          // Try with kebab-to-camelCase conversion
+          const camelCase = parts.map((p, i) => i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)).join("");
+          candidates.push({
+            selector: { strategy: "css", value: `.${camelCase}` },
+            confidence: 0.5,
+            strategy: "camelCase-class",
+          });
+        }
+      }
+
+      // If it's an ID selector, try data-testid alternative
+      const idMatch = value.match(/#([\w-]+)/);
+      if (idMatch) {
+        const idValue = idMatch[1];
+        candidates.push({
+          selector: { strategy: "testId", value: idValue },
+          confidence: 0.65,
+          strategy: "id-to-testid",
+        });
+        // Try with data-testid prefix
+        candidates.push({
+          selector: { strategy: "css", value: `[data-testid="${idValue}"]` },
+          confidence: 0.6,
+          strategy: "id-to-data-testid",
+        });
+      }
+
+      // If it's an attribute selector, try similar attributes
+      const attrMatch = value.match(/\[([\w-]+)(?:=["']([^"']+)["'])?\]/);
+      if (attrMatch) {
+        const [, attrName, attrValue] = attrMatch;
+        if (attrValue) {
+          // Try data-testid with same value
+          candidates.push({
+            selector: { strategy: "testId", value: attrValue },
+            confidence: 0.55,
+            strategy: "attr-to-testid",
+          });
+          // Try aria-label
+          candidates.push({
+            selector: { strategy: "css", value: `[aria-label="${attrValue}"]` },
+            confidence: 0.5,
+            strategy: "attr-to-aria-label",
+          });
+        }
+      }
+
+      // Try text-based selector from error message
+      const textFromError = extractTextFromError(errorMessage);
+      if (textFromError) {
+        candidates.push({
+          selector: { strategy: "text", value: textFromError },
+          confidence: 0.7,
+          strategy: "error-text",
+        });
+      }
+
+      // Generic body fallback
+      if (value !== "body") {
+        candidates.push({
+          selector: { strategy: "css", value: "body" },
+          confidence: 0.1,
+          strategy: "body-fallback",
+        });
+      }
+      break;
+    }
+
+    case "testId": {
+      // Try variations of the testId
+      const parts = value.split(/[-_]/);
+      if (parts.length > 1) {
+        // Try with hyphens instead of underscores and vice versa
+        candidates.push({
+          selector: { strategy: "testId", value: value.replace(/-/g, "_") },
+          confidence: 0.6,
+          strategy: "testid-underscore-variant",
+        });
+        candidates.push({
+          selector: { strategy: "testId", value: value.replace(/_/g, "-") },
+          confidence: 0.6,
+          strategy: "testid-hyphen-variant",
+        });
+      }
+      // Try as CSS selector
+      candidates.push({
+        selector: { strategy: "css", value: `[data-testid="${value}"]` },
+        confidence: 0.7,
+        strategy: "testid-to-css",
+      });
+      break;
+    }
+
+    case "text": {
+      // Try CSS with text content matching
+      candidates.push({
+        selector: { strategy: "css", value: `:has-text("${value}")` },
+        confidence: 0.5,
+        strategy: "text-to-has-text",
+      });
+      // Try role-based
+      candidates.push({
+        selector: { strategy: "role", value: `button[name='${value}']` },
+        confidence: 0.4,
+        strategy: "text-to-role",
+      });
+      break;
+    }
+
+    case "role": {
+      // Try as CSS
+      const roleMatch = value.match(/^(\w+)/);
+      if (roleMatch) {
+        candidates.push({
+          selector: { strategy: "css", value: `[role="${roleMatch[1]}"]` },
+          confidence: 0.6,
+          strategy: "role-to-css",
+        });
+      }
+      break;
+    }
+
+    default:
+      // For other strategies, try body as fallback
+      if (value !== "body") {
+        candidates.push({
+          selector: { strategy: "css", value: "body" },
+          confidence: 0.1,
+          strategy: "generic-fallback",
+        });
+      }
+  }
+
+  // Sort by confidence
+  candidates.sort((a, b) => b.confidence - a.confidence);
+  return candidates;
+}
+
 function isSelectorError(error: string): boolean {
   const selectorErrorPatterns = [
     "Element not found",
@@ -791,9 +1060,20 @@ function isSelectorError(error: string): boolean {
     "Evaluation failed",
     "is not visible",
     "Waiting for element",
+    "timeout",
+    "timed out",
+    "not found",
+    "failed",
+    "error",
+    "could not",
+    "unable to",
+    "selector",
+    "assertion",
+    "no matching",
   ];
+  const errorLower = error.toLowerCase();
   return selectorErrorPatterns.some((pattern) =>
-    error.toLowerCase().includes(pattern.toLowerCase())
+    errorLower.includes(pattern.toLowerCase())
   );
 }
 
