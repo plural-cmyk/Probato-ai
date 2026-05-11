@@ -199,9 +199,17 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Generate a combined code preview for the frontend
+      const combinedCode = generateCombinedTestFile(
+        features[0].project ? "Probato Project" : "Project",
+        targetUrl,
+        featureData
+      );
+
       return NextResponse.json({
         generated: true,
         format: "suite",
+        code: combinedCode,
         suite: {
           ...suite,
           testCases: suite.testCases.map((tc) => ({
@@ -210,6 +218,7 @@ export async function POST(request: NextRequest) {
             description: tc.description,
             selectors: tc.selectors,
             url: tc.url,
+            code: tc.code,
           })),
         },
         savedCount,

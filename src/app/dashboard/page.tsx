@@ -326,6 +326,7 @@ export default function DashboardPage() {
     featureCount: number;
     savedCount: number;
     code?: string;
+    testCases?: { name: string; featureName: string; description: string; code: string }[];
     error?: string;
   } | null>(null);
   const [autoHealing, setAutoHealing] = useState(false);
@@ -939,11 +940,19 @@ export default function DashboardPage() {
       const data = await res.json();
       if (res.ok) {
         // Extract code from different response formats
-        let code = data.suite?.testCases?.[0]?.code ?? data.code ?? data.testCase?.code ?? "";
+        let code = data.code ?? data.suite?.testCases?.[0]?.code ?? data.testCase?.code ?? "";
+        // Extract individual test cases with their code
+        const testCases = data.suite?.testCases?.map((tc: { name: string; featureName: string; description: string; code: string }) => ({
+          name: tc.name,
+          featureName: tc.featureName,
+          description: tc.description,
+          code: tc.code ?? "",
+        })) ?? [];
         setGeneratedResult({
           featureCount: data.featureCount ?? 0,
           savedCount: data.savedCount ?? 0,
           code,
+          testCases,
         });
       } else {
         console.error("[Generate] API error:", data.error || data.details);
@@ -2949,15 +2958,33 @@ export default function DashboardPage() {
                         </div>
                       ) : (
                         <>
-                          <div className="flex gap-3 mb-2">
+                          <div className="flex gap-3 mb-3">
                             <Badge variant="secondary" className="text-xs">{generatedResult.featureCount} features</Badge>
                             <Badge variant="secondary" className="text-xs text-emerald">{generatedResult.savedCount} saved to DB</Badge>
                           </div>
+                          {/* Test Cases List */}
+                          {generatedResult.testCases && generatedResult.testCases.length > 0 && (
+                            <div className="mb-3 space-y-1">
+                              <p className="text-xs font-medium text-deep-indigo mb-1">Test Cases:</p>
+                              {generatedResult.testCases.map((tc, idx) => (
+                                <details key={idx} className="group">
+                                  <summary className="cursor-pointer text-xs text-muted-foreground hover:text-deep-indigo flex items-center gap-1 py-0.5">
+                                    <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform shrink-0" />
+                                    <span className="truncate">{tc.featureName || tc.name}</span>
+                                  </summary>
+                                  <pre className="mt-1 rounded-lg bg-zinc-950 text-zinc-100 p-3 text-xs font-mono overflow-x-auto max-h-48">
+                                    {(tc.code ?? "").substring(0, 1500)}
+                                  </pre>
+                                </details>
+                              ))}
+                            </div>
+                          )}
+                          {/* Combined test code */}
                           {generatedResult.code && (
                             <details className="group">
                               <summary className="cursor-pointer text-xs text-muted-foreground hover:text-deep-indigo flex items-center gap-1">
                                 <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform" />
-                                View generated test code
+                                View combined test file
                               </summary>
                               <pre className="mt-2 rounded-lg bg-zinc-950 text-zinc-100 p-3 text-xs font-mono overflow-x-auto max-h-60">
                                 {(generatedResult.code ?? "").substring(0, 2000)}
