@@ -22,6 +22,8 @@ import {
   Zap,
   BarChart3,
   Lightbulb,
+  ListChecks,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -108,9 +110,37 @@ export default function ProjectDetailPage() {
   const [expandedRun, setExpandedRun] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [runningTests, setRunningTests] = useState(false);
+  const [autoHealing, setAutoHealing] = useState(false);
+  const [loadingTestOrder, setLoadingTestOrder] = useState(false);
+  const [csvDownloading, setCsvDownloading] = useState(false);
   const [suggestingFixFor, setSuggestingFixFor] = useState<string | null>(null);
   const [fixPanelKey, setFixPanelKey] = useState(0);
   const [scanPanelKey, setScanPanelKey] = useState(0);
+
+  // Result states
+  const [testRunResult, setTestRunResult] = useState<{
+    testRunId: string;
+    status: string;
+    totalSteps: number;
+    passedSteps: number;
+    failedSteps: number;
+    duration: number;
+    error?: string;
+  } | null>(null);
+  const [autoHealResult, setAutoHealResult] = useState<{
+    healed: boolean;
+    totalHealed: number;
+    totalFailed: number;
+    duration: number;
+    error?: string;
+  } | null>(null);
+  const [testOrder, setTestOrder] = useState<{
+    levels: { id: string; name: string; type: string; priority: number }[][];
+    totalFeatures: number;
+    maxDepth: number;
+    cycleCount: number;
+  } | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -188,6 +218,136 @@ export default function ProjectDetailPage() {
     }
   }
 
+  async function runProjectTests() {
+    setRunningTests(true);
+    setTestRunResult(null);
+    try {
+      const url = data?.project.liveUrl || data?.project.sandboxUrl || data?.project.repoUrl;
+      if (!url) {
+        setTestRunResult({ testRunId: "", status: "error", totalSteps: 0, passedSteps: 0, failedSteps: 0, duration: 0, error: "No URL available for this project." });
+        setRunningTests(false);
+        return;
+      }
+
+      // Build actions from features
+      const testActions: { type: string; label: string; url?: string; selector?: { strategy: string; value: string } }[] = [];
+      if (features.length > 0) {
+        for (const feature of features) {
+          testActions.push({ type: "navigate", label: `Navigate to ${feature.name}`, url });
+          testActions.push({ type: "waitForSelector", label: `Wait for ${feature.name}`, selector: { strategy: "css", value: feature.selector ?? "body" } });
+          testActions.push({ type: "screenshot", label: `Screenshot: ${feature.name}` });
+        }
+      } else {
+        testActions.push({ type: "navigate", label: "Navigate to target", url });
+        testActions.push({ type: "waitForSelector", label: "Wait for page", selector: { strategy: "css", value: "body" } });
+        testActions.push({ type: "screenshot", label: "Page loaded" });
+      }
+
+      const res = await fetch("/api/test/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, projectId, actions: testActions, screenshotEveryStep: true }),
+      });
+      const data2 = await res.json();
+      if (res.ok) {
+        const result = data2.result;
+        setTestRunResult({
+          testRunId: data2.testRunId ?? "",
+          status: result?.status ?? "unknown",
+          totalSteps: result?.summary?.total ?? 0,
+          passedSteps: result?.summary?.passed ?? 0,
+          failedSteps: result?.summary?.failed ?? 0,
+          duration: result?.duration ?? 0,
+        });
+        await loadProjectData(); // Refresh test run history
+      } else {
+        setTestRunResult({ testRunId: "", status: "error", totalSteps: 0, passedSteps: 0, failedSteps: 0, duration: 0, error: data2.error || data2.details || "Test run failed" });
+      }
+    } catch (err) {
+      console.error("Run tests failed:", err);
+      setTestRunResult({ testRunId: "", status: "error", totalSteps: 0, passedSteps: 0, failedSteps: 0, duration: 0, error: "Network error — the request may have timed out." });
+    } finally {
+      setRunningTests(false);
+    }
+  }
+
+  async function runAutoHeal() {
+    setAutoHealing(true);
+    setAutoHealResult(null);
+    try {
+      const url = data?.project.liveUrl || data?.project.sandboxUrl || data?.project.repoUrl;
+      const failedRun = testRuns.find((r) => r.status === "failed" || r.status === "error");
+      if (!failedRun) {
+        setAutoHealResult({ healed: false, totalHealed: 0, totalFailed: 0, duration: 0, error: "No failed test run found. Run a test first, then auto-heal can repair broken selectors." });
+        setAutoHealing(false);
+        return;
+      }
+      const healRes = await fetch("/api/auto-heal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ testRunId: failedRun.id, url }),
+      });
+      const healData = await healRes.json();
+      if (healRes.ok) {
+        setAutoHealResult({ healed: healData.healed, totalHealed: healData.report?.totalHealed ?? 0, totalFailed: healData.report?.totalFailed ?? 0, duration: healData.report?.duration ?? 0, error: healData.report?.error });
+        await loadProjectData();
+      } else {
+        setAutoHealResult({ healed: false, totalHealed: 0, totalFailed: 0, duration: 0, error: healData.error || "Auto-heal request failed" });
+      }
+    } catch {
+      setAutoHealResult({ healed: false, totalHealed: 0, totalFailed: 0, duration: 0, error: "Request failed — the function may have timed out." });
+    } finally {
+      setAutoHealing(false);
+    }
+  }
+
+  async function loadTestOrder() {
+    setLoadingTestOrder(true);
+    try {
+      const res = await fetch(`/api/test-order?projectId=${projectId}&impact=true`);
+      const data2 = await res.json();
+      if (res.ok) {
+        const execOrder = data2.executionOrder ?? null;
+        if (execOrder && execOrder.cycleCount === undefined && data2.cycleCount !== undefined) {
+          execOrder.cycleCount = data2.cycleCount;
+        }
+        setTestOrder(execOrder);
+      } else {
+        setTestOrder(null);
+      }
+    } catch {
+      setTestOrder(null);
+    } finally {
+      setLoadingTestOrder(false);
+    }
+  }
+
+  async function downloadCSV() {
+    setCsvDownloading(true);
+    try {
+      const res = await fetch(`/api/reports?projectId=${projectId}&format=csv`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const disposition = res.headers.get("Content-Disposition");
+        const filenameMatch = disposition?.match(/filename=?([^"]+)?"?/);
+        a.download = filenameMatch?.[1] ?? `${project.name || "project"}-report.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        alert("Failed to download CSV report");
+      }
+    } catch {
+      alert("Failed to download CSV. Please try again.");
+    } finally {
+      setCsvDownloading(false);
+    }
+  }
+
   if (status === "loading" || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -226,7 +386,7 @@ export default function ProjectDetailPage() {
             <span className="font-semibold text-deep-indigo">{project.name}</span>
             <Badge variant="secondary" className="text-xs">{project.status}</Badge>
           </div>
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex flex-wrap gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -244,6 +404,42 @@ export default function ProjectDetailPage() {
             >
               {generating ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileCode2 className="mr-1 h-3 w-3" />}
               Generate Tests
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={runProjectTests}
+              disabled={runningTests || features.length === 0}
+            >
+              {runningTests ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Play className="mr-1 h-3 w-3" />}
+              Run Tests
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={runAutoHeal}
+              disabled={autoHealing}
+            >
+              {autoHealing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+              Auto-Heal
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadTestOrder}
+              disabled={loadingTestOrder}
+            >
+              {loadingTestOrder ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ListChecks className="mr-1 h-3 w-3" />}
+              Test Order
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={downloadCSV}
+              disabled={csvDownloading}
+            >
+              {csvDownloading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />}
+              CSV
             </Button>
           </div>
         </div>
@@ -286,6 +482,93 @@ export default function ProjectDetailPage() {
           </Card>
         </div>
 
+        {/* Action Results Row */}
+        {(testRunResult || autoHealResult || testOrder) && (
+          <div className="grid gap-4 sm:grid-cols-3 mb-8">
+            {/* Test Run Result */}
+            {testRunResult && (
+              <Card className={testRunResult.status === "passed" ? "border-emerald/30" : testRunResult.error ? "border-warm-red/30" : ""}>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <Play className={`h-4 w-4 ${testRunResult.status === "passed" ? "text-emerald" : testRunResult.error ? "text-warm-red" : "text-amber"}`} />
+                    <CardTitle className="text-sm">Test Run</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {testRunResult.error ? (
+                    <p className="text-xs text-warm-red">{testRunResult.error}</p>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="flex gap-2">
+                        <Badge variant="secondary" className={`text-xs ${testRunResult.status === "passed" ? "text-emerald" : "text-warm-red"}`}>
+                          {testRunResult.status}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs text-emerald">{testRunResult.passedSteps} passed</Badge>
+                        {testRunResult.failedSteps > 0 && (
+                          <Badge variant="secondary" className="text-xs text-warm-red">{testRunResult.failedSteps} failed</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{(testRunResult.duration / 1000).toFixed(1)}s</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Auto-Heal Result */}
+            {autoHealResult && (
+              <Card className={autoHealResult.healed ? "border-emerald/30" : "border-warm-red/30"}>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className={`h-4 w-4 ${autoHealResult.healed ? "text-emerald" : "text-warm-red"}`} />
+                    <CardTitle className="text-sm">Auto-Heal</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2">
+                    <Badge variant="secondary" className={`text-xs ${autoHealResult.healed ? "text-emerald" : "text-warm-red"}`}>
+                      {autoHealResult.healed ? "Healed" : "Could not heal"}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">{autoHealResult.totalHealed} healed</Badge>
+                  </div>
+                  {autoHealResult.error && (
+                    <p className="text-xs text-amber mt-1">{autoHealResult.error}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Test Order Result */}
+            {testOrder && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <ListChecks className="h-4 w-4 text-deep-indigo" />
+                    <CardTitle className="text-sm">Test Order</CardTitle>
+                    <Badge variant="secondary" className="text-xs ml-auto">{testOrder.totalFeatures} features</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {testOrder.levels.map((level, idx) => (
+                      <div key={idx} className="flex items-center gap-1">
+                        <span className="text-xs font-bold text-muted-foreground">{idx + 1}.</span>
+                        {level.slice(0, 3).map((f) => (
+                          <Badge key={f.id} variant="outline" className="text-xs">{f.name}</Badge>
+                        ))}
+                        {level.length > 3 && <span className="text-xs text-muted-foreground">+{level.length - 3}</span>}
+                      </div>
+                    ))}
+                  </div>
+                  {testOrder.cycleCount > 0 && (
+                    <p className="text-xs text-amber mt-1">{testOrder.cycleCount} circular dep(s)</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
         {/* Features Section */}
         <Card className="mb-8">
           <CardHeader className="pb-3">
@@ -308,13 +591,13 @@ export default function ProjectDetailPage() {
                   size="sm"
                   className="mt-3"
                   onClick={discoverFeatures}
-                  disabled={discovering || !project.sandboxUrl}
+                  disabled={discovering || !project.liveUrl && !project.sandboxUrl && !project.repoUrl}
                 >
                   {discovering ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
                   Discover Features
                 </Button>
-                {!project.sandboxUrl && (
-                  <p className="text-xs text-muted-foreground mt-2">Launch a sandbox first to enable discovery</p>
+                {!project.liveUrl && !project.sandboxUrl && !project.repoUrl && (
+                  <p className="text-xs text-muted-foreground mt-2">Add a live URL or launch a sandbox to enable discovery</p>
                 )}
               </div>
             ) : (
